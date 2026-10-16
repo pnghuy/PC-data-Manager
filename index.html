@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tinh tế Laptop Lab – Tra cứu kết quả test laptop</title>
+  <meta name="description" content="Tra cứu kết quả test hiệu năng CPU, GPU, màn hình và thời lượng pin của các mẫu laptop đã được Tinh tế đánh giá." />
+  <meta property="og:title" content="Tinh tế Laptop Lab" />
+  <meta property="og:description" content="Tra cứu kết quả test hiệu năng, màn hình và pin laptop của Tinh tế." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f7cf6'/%3E%3Cpath d='M8 11h16v9H8z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='M5 23h22' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="#/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 7h14v9H5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 19h19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        <span class="brand-text"><b>Tinh tế</b> Laptop Lab</span>
+      </a>
+      <nav class="topnav">
+        <a href="#/">Tất cả máy</a>
+        <a href="https://tinhte.vn" target="_blank" rel="noopener">Tinhte.vn ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="app" class="container" aria-live="polite">
+    <div class="state">Đang tải dữ liệu…</div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p><b>Lưu ý:</b> Kết quả được nhập thủ công từ các bài test của Tinh tế, thực hiện trong điều kiện phòng test cụ thể nên có thể khác biệt khi bạn test ở môi trường khác. Hãy tham khảo thêm bài review chi tiết trước khi quyết định mua.</p>
+      <p class="muted">© Tinh tế Laptop Lab</p>
+    </div>
+  </footer>
+
+  <!-- Thứ tự load quan trọng: config → schema → dữ liệu mẫu → xử lý dữ liệu → giao diện -->
+  <script src="js/config.js"></script>
+  <script src="js/schema.js"></script>
+  <script src="data/github-snapshot.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
