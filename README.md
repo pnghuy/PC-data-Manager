@@ -161,3 +161,22 @@ tinhte-laptop-lab/
 │   └── games.csv               # Template tham khảo
 └── README.md                   # Tài liệu hướng dẫn sử dụng
 ```
+
+---
+
+## 7. Lệnh npm & Môi trường phát triển cục bộ
+
+Cài đặt thư viện môi trường:
+```bash
+npm install
+```
+
+Các lệnh chính được cấu hình sẵn:
+- `npm run dev` hoặc `npm start`: Khởi động máy chủ dev Vite tốc độ cao kèm live-reload tại `http://localhost:3000`.
+- `npm run serve`: Chạy máy chủ tĩnh Node.js thuần (zero-dependency, chạy được ngay cả khi chưa tải package).
+- `npm run validate`: Tự động kiểm tra tính hợp lệ của dữ liệu benchmark, metadata JSON, file CSV và snapshot.
+- `npm run build`: Đóng gói toàn bộ web tĩnh và dữ liệu vào thư mục `dist/` để sẵn sàng deploy.
+- `npm run sync-data`: Tải và cập nhật snapshot mới nhất từ repo GitHub `tinhte-charts`.
+- `npm run lint`: Kiểm tra chuẩn code JavaScript với ESLint flat config.
+- `npm run format`: Tự động định dạng code bằng Prettier.
+

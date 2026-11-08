@@ -1,4 +1,4 @@
-﻿/* Snapshot of pnghuy/tinhte-charts data files for offline / instant loading */
+/* Snapshot of pnghuy/tinhte-charts data files for offline / instant loading */
 window.LAB = window.LAB || {};
 LAB.GITHUB_SNAPSHOT = {
   "data/2026-07-rog-strix-scar-18/3DMark-Fire-Strike-rog-strix-scar18-2026.json": {
@@ -360,5 +360,5 @@ LAB.GITHUB_SNAPSHOT = {
     { "name": "Crosshair 16 Max HX (Core Ultra 9 290HX Plus)",       "values": [3200, 21700], "highlight": true },
     { "name": "Blade 16 (Ryzen AI 9 HX370)", "values": [2905, 8113] }
   ]
-},
+}
 };

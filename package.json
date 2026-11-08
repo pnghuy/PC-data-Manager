@@ -1,0 +1,37 @@
+{
+  "name": "pc-data-manager",
+  "version": "1.0.0",
+  "description": "Hệ thống tra cứu và quản lý dữ liệu kết quả test laptop / máy tính (Tinh tế Laptop Lab)",
+  "type": "module",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "start": "npm run dev",
+    "serve": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "vite preview",
+    "validate": "node scripts/validate-data.mjs",
+    "sync-data": "node scripts/sync-charts.mjs",
+    "lint": "eslint \"js/**/*.js\" \"scripts/**/*.mjs\"",
+    "lint:fix": "eslint \"js/**/*.js\" \"scripts/**/*.mjs\" --fix",
+    "format": "prettier --write \"{assets,data,js,scripts,templates}/**/*.{js,mjs,css,json,md}\" \"index.html\" \"README.md\"",
+    "format:check": "prettier --check \"{assets,data,js,scripts,templates}/**/*.{js,mjs,css,json,md}\" \"index.html\" \"README.md\""
+  },
+  "keywords": [
+    "tinhte",
+    "laptop",
+    "benchmark",
+    "data-manager",
+    "charts",
+    "hardware-test"
+  ],
+  "author": "pnghuy <giahuy0308@outlook.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.5.0",
+    "vite": "^6.1.0"
+  }
+}
