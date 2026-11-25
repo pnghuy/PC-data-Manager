@@ -15,8 +15,8 @@ if (fs.existsSync(distDir)) {
 }
 fs.mkdirSync(distDir, { recursive: true });
 
-// 2. Danh sách thư mục & file cần copy
-const itemsToCopy = ['index.html', 'assets', 'js', 'data', 'templates', 'README.md'];
+// 2. Danh sách thư mục & file cần copy cho bản deploy public
+const itemsToCopy = ['index.html', 'assets', 'js', 'data'];
 
 let fileCount = 0;
 
@@ -39,8 +39,35 @@ for (const item of itemsToCopy) {
   if (fs.existsSync(srcPath)) {
     copyRecursive(srcPath, destPath);
     console.log(`  ✓ Đã copy: ${item}`);
+  } else {
+    console.error(`❌ Không tìm thấy nguồn bắt buộc: ${item}`);
+    process.exit(1);
   }
 }
 
+// 3. Tạo file .nojekyll để GitHub Pages phục vụ trực tiếp file tĩnh
+fs.writeFileSync(path.join(distDir, '.nojekyll'), '');
+
+// 4. Kiểm tra đủ các file bắt buộc trong dist/
+const requiredOutputs = [
+  'index.html',
+  'assets/style.css',
+  'js/config.js',
+  'js/schema.js',
+  'js/data.js',
+  'js/export.js',
+  'js/app.js',
+  'data/kho-snapshot.js',
+];
+
+const missingOutputs = requiredOutputs.filter(
+  (relPath) => !fs.existsSync(path.join(distDir, relPath)),
+);
+
+if (missingOutputs.length > 0) {
+  console.error(`\n❌ Thiếu file bắt buộc trong dist/: ${missingOutputs.join(', ')}`);
+  process.exit(1);
+}
+
 console.log(`\n🎉 Build hoàn tất! Đã xuất ${fileCount} file vào thư mục dist/.`);
-console.log('   Bạn có thể deploy thư mục dist/ trực tiếp lên Cloudflare Pages, Vercel hoặc GitHub Pages.');
+console.log('   Chạy `npm run preview` để xem thử bản dist/ trước khi deploy.');

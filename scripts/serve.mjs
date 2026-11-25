@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+const projectDir = path.resolve(__dirname, '..');
+const rootDir = process.argv[2] ? path.resolve(projectDir, process.argv[2]) : projectDir;
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 

@@ -95,27 +95,36 @@ Ngày test, link bài review, ảnh, RAM, màn hình, pin… không nằm trong 
 
 ---
 
-## 5. Hướng dẫn Deploy & Gán Tên Miền Tinh tế
+## 5. Hướng dẫn Deploy & Gắn Tên Miền
 
-Toàn bộ project là mã nguồn web tĩnh (HTML/CSS/Vanilla JS thuần, không cần npm build, không cần máy chủ Node.js):
+Toàn bộ project là web tĩnh (HTML/CSS/JS thuần, không cần máy chủ Node.js). Lệnh `npm run build` đóng gói đủ `index.html`, `assets/`, `js/`, `data/` vào thư mục `dist/`.
 
-### Cách 1: Cloudflare Pages (Khuyên dùng nhất – Cực nhanh & Ổn định)
-1. Đăng nhập [Cloudflare Dashboard](https://dash.cloudflare.com/).
-2. Chọn **Workers & Pages** > **Create application** > chọn thẻ **Pages**.
-3. Chọn **Upload assets**: Kéo thả toàn bộ thư mục `tinhte-laptop-lab` lên.
-4. Bấm **Deploy**.
-5. Trong cài đặt Pages > mục **Custom domains**, bấm thêm tên miền (ví dụ: `laptop.tinhte.vn` hoặc `lab.tinhte.vn`). Cloudflare sẽ tự động cấp chứng chỉ bảo mật SSL HTTPS miễn phí.
+Kiểm tra nhanh bản build trên máy trước khi deploy:
 
-### Cách 2: GitHub Pages
-1. Tạo một repository mới trên GitHub (ví dụ: `tinhte-laptop-lab`).
-2. Đẩy toàn bộ thư mục này lên repo.
-3. Vào tab **Settings** > **Pages** > Chọn Source là branch `main` và thư mục `/ (root)`.
-4. Điền Custom Domain nếu muốn trỏ subdomain Tinh tế.
+```bash
+npm run build
+npm run preview    # mở thử bản dist/ tại http://localhost:4173
+```
 
-### Cách 3: Vercel
-1. Đăng nhập [vercel.com](https://vercel.com).
-2. Tạo project mới bằng cách import thư mục hoặc gõ lệnh `vercel deploy`.
-3. Gán Custom Domain trong phần Settings > Domains.
+### Cách 1: Cloudflare Pages (Khuyên dùng – nhanh, tự động deploy khi merge `main`)
+1. Đăng nhập [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **Create** → chọn thẻ **Pages** → **Connect to Git**.
+2. Chọn repo `pnghuy/PC-data-Manager`, nhánh production: `main`.
+3. Cấu hình build:
+   - **Framework preset**: `None`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+4. Bấm **Save and Deploy**. Mỗi lần merge PR vào `main`, Cloudflare tự build lại và phát hành.
+5. Gắn tên miền riêng: vào **Custom domains** → **Set up a custom domain** (ví dụ `laptop.tinhte.vn` hoặc `lab.tinhte.vn`). Nếu DNS đã nằm trên Cloudflare, bản ghi CNAME và chứng chỉ HTTPS sẽ được cấp tự động.
+
+### Cách 2: GitHub Pages (đã có sẵn workflow)
+Repo đã có sẵn workflow [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) tự chạy `npm run lint`, `npm run validate`, `npm run build` rồi deploy thư mục `dist/` mỗi khi có commit mới trên `main`.
+
+1. Mở repo trên GitHub → **Settings** → **Pages**.
+2. Ở mục **Build and deployment → Source**, chọn **GitHub Actions**.
+3. Đợi workflow **Deploy GitHub Pages** chạy xong (hoặc bấm **Run workflow** trong tab **Actions** để chạy ngay).
+4. (Tuỳ chọn) Gắn tên miền riêng ở mục **Custom domain**, sau đó trỏ bản ghi `CNAME` của tên miền về `pnghuy.github.io` và bật **Enforce HTTPS**.
+
+> Lưu ý: Web dùng đường dẫn tương đối và hash URL (`#/`, `#/may/<id>`, `#/so-sanh`), nên chạy được cả ở tên miền gốc (`https://laptop.tinhte.vn/`) lẫn thư mục con (`https://pnghuy.github.io/PC-data-Manager/`).
 
 ---
 
