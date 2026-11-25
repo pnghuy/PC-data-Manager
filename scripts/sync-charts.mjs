@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Tải kho.json mới nhất của tinhte-charts về làm bản dự phòng khi web không tải được từ GitHub.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
@@ -9,56 +10,24 @@ const rootDir = path.resolve(__dirname, '..');
 const OWNER = 'pnghuy';
 const REPO = 'tinhte-charts';
 const BRANCH = 'main';
-const DATA_DIR = 'data';
-
-console.log(`📡 Đang chuẩn bị đồng bộ dữ liệu benchmark từ ${OWNER}/${REPO} (${BRANCH})...`);
-
-const token = process.env.GITHUB_TOKEN;
-const headers = {
-  'User-Agent': 'PC-Data-Manager-Sync-Script',
-  Accept: 'application/vnd.github.v3+json',
-};
-if (token) {
-  headers['Authorization'] = `token ${token}`;
-}
+const KHO = 'kho.json';
 
 async function run() {
+  const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${KHO}`;
+  console.log(`📡 Đang tải ${url} ...`);
   try {
-    const treeUrl = `https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
-    console.log(`🔍 Truy vấn cây thư mục: ${treeUrl}`);
-    const res = await fetch(treeUrl, { headers });
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`GitHub phản hồi mã lỗi: ${res.status} ${res.statusText}`);
+    const kho = await res.json();
+    if (!kho || typeof kho.devices !== 'object') throw new Error('kho.json không có mục "devices"');
 
-    if (!res.ok) {
-      throw new Error(`GitHub API phản hồi mã lỗi: ${res.status} ${res.statusText}`);
-    }
-
-    const data = await res.json();
-    const jsonFiles = (data.tree || []).filter(
-      (item) =>
-        item.type === 'blob' &&
-        item.path.startsWith(`${DATA_DIR}/`) &&
-        item.path.endsWith('.json')
-    );
-
-    console.log(`📦 Tìm thấy ${jsonFiles.length} file biểu đồ JSON.`);
-
-    const snapshot = {};
-    for (const file of jsonFiles) {
-      const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${file.path}`;
-      const fileRes = await fetch(rawUrl);
-      if (fileRes.ok) {
-        const jsonContent = await fileRes.json();
-        snapshot[file.path] = jsonContent;
-      } else {
-        console.warn(`⚠️ Không tải được ${file.path}`);
-      }
-    }
-
-    const targetPath = path.join(rootDir, 'data', 'github-snapshot.js');
-    const fileContent = `/* Snapshot of ${OWNER}/${REPO} data files for offline / instant loading */\n/* Generated at ${new Date().toISOString()} */\nwindow.LAB = window.LAB || {};\nLAB.GITHUB_SNAPSHOT = ${JSON.stringify(snapshot, null, 2)};\n`;
-
+    const targetPath = path.join(rootDir, 'data', 'kho-snapshot.js');
+    const fileContent =
+      `/* Bản dự phòng kho.json của ${OWNER}/${REPO}, dùng khi không tải được từ GitHub. Tạo bằng: npm run sync-data */\n` +
+      `window.LAB = window.LAB || {};\n` +
+      `LAB.KHO_SNAPSHOT = ${JSON.stringify(kho, null, 1)};\n`;
     fs.writeFileSync(targetPath, fileContent, 'utf-8');
-    console.log(`✅ Đã cập nhật thành công snapshot vào: ${targetPath}`);
+    console.log(`✅ ${Object.keys(kho.devices).length} máy → ${path.relative(rootDir, targetPath)}`);
   } catch (err) {
     console.error(`❌ Đồng bộ thất bại: ${err.message}`);
     process.exit(1);

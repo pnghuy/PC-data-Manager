@@ -3,93 +3,46 @@
 Hệ thống tra cứu kết quả benchmark, hiệu năng CPU, GPU, màn hình, pin và FPS game thực tế của các mẫu laptop do Tinh tế đánh giá. Tương tự như laplap.tech nhưng được tối ưu riêng cho nhu cầu của Tinh tế.
 
 Website hoạt động theo mô hình **Zero-Backend (Serverless)**:
-- **Nguồn dữ liệu**: Đọc trực tiếp từ kho lưu trữ GitHub của Tinh tế: [`pnghuy/tinhte-charts`](https://github.com/pnghuy/tinhte-charts).
-- **Tự động cập nhật**: Mỗi khi reviewer push commit hoặc tạo thư mục bài test JSON mới trong `data/`, website sẽ tự phát hiện và hiển thị kết quả ngay, không cần cấu hình database hay build lại frontend.
-- **Offline / Local First**: Hỗ trợ mở trực tiếp file `index.html` trong máy tính mà không sợ lỗi CORS nhờ bộ đệm thông minh, cache `localStorage`, và fallback jsDelivr CDN.
-- **Hosting**: Triển khai miễn phí trọn đời trên Cloudflare Pages, Vercel hoặc GitHub Pages, dễ dàng gán tên miền riêng (ví dụ: `laptop.tinhte.vn` hoặc `lab.tinhte.vn`).
+- **Nguồn dữ liệu**: một file duy nhất, [`kho.json`](https://github.com/pnghuy/tinhte-charts/blob/main/kho.json) ở gốc repo `pnghuy/tinhte-charts`. Đây cũng là kho máy mà Tinhte Chart Studio đọc và ghi.
+- **Tự động cập nhật**: lưu máy mới trong Chart Studio là `kho.json` đổi, web tự hiện máy đó sau vài phút, không cần build lại.
+- **Dự phòng**: nếu không tải được từ GitHub, web thử jsDelivr, rồi bản đệm trong trình duyệt, rồi bản `data/kho-snapshot.js` đi kèm.
+- **Hosting**: web tĩnh, deploy miễn phí trên Cloudflare Pages, Vercel hoặc GitHub Pages.
 
 ---
 
-## 1. Trải nghiệm nhanh trên máy tính
-Bạn chỉ cần mở trực tiếp file `index.html` bằng bất kỳ trình duyệt nào (Chrome, Edge, Firefox, Safari) mà không cần cài thêm công cụ gì:
-- Đường dẫn: `C:\Users\Tinhte\.gemini\antigravity\scratch\tinhte-laptop-lab\index.html`
-- Website tự động đồng bộ từ repo GitHub `pnghuy/tinhte-charts` hoặc nạp snapshot đi kèm nếu không có mạng.
+## 1. Chạy thử trên máy
 
----
-
-## 2. Cách dữ liệu được tổ chức trong repo GitHub
-
-Trong repo `pnghuy/tinhte-charts`, website đọc dữ liệu từ 2 thư mục:
-
-```text
-pnghuy/tinhte-charts/
-├── data/                                 # Chứa các bài test benchmark
-│   ├── 2026-07-zephyrus-duo/             # Mỗi thư mục = 1 máy được đánh giá
-│   │   ├── Cinebench-2026.json           # Biểu đồ Cinebench
-│   │   ├── Geekbench6.json               # Biểu đồ Geekbench
-│   │   ├── 3DMark-TimeSpy.json           # Biểu đồ 3DMark Time Spy
-│   │   └── PCMark10.json                 # Biểu đồ PCMark
-│   └── 2026-07-rog-strix-scar-18/
-│       ├── Cinebench 2024-...json
-│       └── ...
-└── laptops/                              # (Tuỳ chọn) Chứa thông số chi tiết của máy
-    ├── 2026-07-zephyrus-duo.json         # Tên file trùng tên thư mục trong data/
-    └── 2026-07-rog-strix-scar-18.json
+```bash
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-### Quy tắc nhận diện tự động trong `data/`:
-1. **Thư mục con**: Tên thư mục quy định mã định danh của máy (vd: `2026-07-zephyrus-duo`). Tiền tố `YYYY-MM` sẽ được tự động nhận diện thành thời gian test.
-2. **File biểu đồ JSON**: Mỗi file JSON là một bài test so sánh.
-3. **Máy được đánh giá**: Trong mảng `items`, phần tử có `"highlight": true` chính là chiếc laptop đang được review. Website tự động:
-   - Trích xuất điểm số của máy này để đưa vào danh mục và xếp hạng.
-   - Nhận diện phần cứng CPU, GPU từ chuỗi tên trong ngoặc (ví dụ: `Zephyrus DUO (Ultra 9 386H)` → CPU: `Ultra 9 386H`).
-4. **Các máy so sánh**: Tất cả các phần tử khác trong `items` được giữ nguyên để vẽ biểu đồ thanh (bar chart) so sánh trực quan trong trang chi tiết của máy.
-5. **Đa series**: Hỗ trợ đầy đủ các bài test có nhiều cột dữ liệu như Cinebench (Single-core & Multi-core) hoặc Geekbench (Cắm sạc & Chạy pin).
+Hoặc `npm run serve` nếu chưa cài package.
 
 ---
 
-## 3. Cách thêm thông tin chi tiết (Màn hình, Pin, Link bài Tinh tế)
+## 2. Dữ liệu lấy từ đâu
 
-Các công cụ render biểu đồ video của bạn chỉ cần thư mục `data/`. Để bổ sung thêm thông số chuyên sâu (màn hình, thời lượng pin, RAM, cân nặng, ảnh đại diện, link bài review Tinh tế) mà **không làm ảnh hưởng** đến script render video:
-
-Bạn chỉ cần tạo thêm thư mục `laptops/` ở ngoài gốc repo, và tạo file JSON trùng tên với thư mục trong `data/`:
-Ví dụ: `laptops/2026-07-zephyrus-duo.json`
-
-Xem mẫu cấu trúc đầy đủ tại: [`templates/sample-laptop-metadata.json`](templates/sample-laptop-metadata.json):
+Mỗi mục trong `devices` của `kho.json` là một máy:
 
 ```json
-{
-  "name": "ASUS ROG Zephyrus Duo 16",
-  "brand": "ASUS",
-  "tester": "Huy Nguyễn",
-  "review_url": "https://tinhte.vn/thread/danh-gia-asus-rog-zephyrus-duo-16.3700000/",
-  "image_url": "https://photo2.tinhte.vn/data/attachment-files/2026/07/laptop.jpg",
-  "cpu": "AMD Ryzen 9 7945HX",
-  "gpu": "RTX 4090 175W",
-  "ram": "32GB DDR5",
-  "storage": "2TB NVMe PCIe 4.0",
-  "weight_kg": 2.67,
-  "display": {
-    "size": 16.0,
-    "resolution": "2560 x 1600 (QHD+)",
-    "refresh_hz": 240,
-    "panel": "Mini-LED",
-    "brightness": 1100,
-    "srgb": 100,
-    "dcip3": 100,
-    "deltae": 0.85
-  },
-  "battery": {
-    "wh": 90,
-    "charger_w": 330,
-    "office": "6g 30p",
-    "video": "8g 15p",
-    "gaming": "1g 40p"
-  }
+"acer-nitro-propanel-anv16-core-5-205h-rtx-3050-65w-laptop": {
+  "name": "Acer Nitro ProPanel ANV16",
+  "cpu": "Core 5 205H",
+  "gpu": "RTX 3050 65W",
+  "type": "laptop",
+  "measured": true,
+  "scores": { "cinebench-2024": [108, 580], "3dmark-time-spy": [5020] }
 }
 ```
 
-*Nếu không có file `laptops/<id>.json`, website vẫn tự hoạt động 100% bình thường bằng cách lấy tên máy và CPU/GPU từ các file JSON trong `data/`.*
+Web xử lý như sau:
+1. **Thẻ máy trên trang chủ**: các laptop/PC có `"measured": true` (Tinh tế tự đo) và có tên máy thật. Dòng chỉ ghi tên chip (`chipOnly`) không thành thẻ.
+2. **Biểu đồ so sánh**: mỗi bài test của máy được so với mọi máy cùng loại có cùng bài test trong kho (laptop/PC không lẫn với card đồ họa rời). Tên hiển thị theo quy tắc của Chart Studio: bài CPU ghi tên CPU, bài đồ họa ghi tên GPU.
+3. **Số tham khảo** (`"measured": false`) chỉ xuất hiện trong biểu đồ, có nhãn "tham khảo" và không tính vào thứ hạng. Dòng tham khảo trùng tên và chip với một máy đã đo thì được gộp vào trang của máy đó.
+4. **Bài test**: id chuẩn nằm trong `LAB.TESTS` ở `js/schema.js` (trùng với Chart Studio). Bài riêng (game, AI…) khai báo trong mục `tests` của `kho.json`.
+
+Web không đọc các file chart trong `data/` của tinhte-charts nữa. Lý do: tên máy trong chart có thể được sửa riêng cho từng bài (ví dụ bài tài trợ chỉ ghi tên chip), còn `kho.json` luôn giữ tên đầy đủ.
 
 ---
 
@@ -106,13 +59,9 @@ Xem mẫu cấu trúc đầy đủ tại: [`templates/sample-laptop-metadata.jso
 4. **Biểu đồ so sánh trực quan**:
    - Thang đo điểm số chuẩn xác (chuẩn hóa giá trị cao nhất/thấp nhất).
    - Máy đang xem được highlight phát sáng với huy hiệu `[MÁY ĐANG XEM]`.
-   - Hiển thị thứ hạng toàn hệ thống: `Hạng #1 / 4 máy`, `Hạng #2 / 5 máy`.
-   - Nút liên kết trực tiếp tới file JSON gốc trên GitHub của từng bài test.
-5. **Cơ chế kiểm soát chất lượng dữ liệu (Data Quality Inspector)**:
-   - Tự động phát hiện nếu có 2 máy trùng tên trong 1 biểu đồ.
-   - Phát hiện nếu tên file và tiêu đề bài test bị vênh nhau.
-   - Phát hiện biểu đồ thiếu máy `highlight: true` hoặc số liệu bị copy nhầm.
-   - Hiển thị nút cảnh báo nhẹ nhàng trên thanh công cụ để reviewer dễ kiểm tra và tinh chỉnh repo.
+   - Thứ hạng trong số các máy Tinh tế tự đo: `Hạng #2 / 16 máy Tinh tế đo`.
+   - Mặc định hiện 7 máy quanh máy đang xem, bấm "Xem tất cả" để mở hết.
+5. **Kiểm tra dữ liệu**: điểm sai số cột hoặc bài test chưa khai báo trong kho được liệt kê ở nút "lưu ý dữ liệu" trên thanh nguồn.
 
 ---
 
@@ -148,13 +97,12 @@ tinhte-laptop-lab/
 ├── assets/
 │   └── style.css               # Giao diện Dark/Light mode chuẩn Tinh tế, tối ưu Mobile
 ├── js/
-│   ├── config.js               # Cấu hình repo GitHub (owner, repo, branch, thư mục)
-│   ├── schema.js               # Quy tắc phân loại bài test, CPU, GPU, Game FPS
-│   ├── data.js                 # Bộ nạp dữ liệu GitHub API + jsDelivr + LocalStorage Cache
+│   ├── config.js               # Cấu hình repo GitHub (owner, repo, branch, file kho)
+│   ├── schema.js               # Danh mục bài test (id trùng Chart Studio) và nhóm hiển thị
+│   ├── data.js                 # Tải kho.json (GitHub → jsDelivr → cache → snapshot), dựng biểu đồ so sánh
 │   └── app.js                  # Bộ định tuyến hash URL, tìm kiếm, lọc, render biểu đồ
 ├── data/
-│   ├── github-snapshot.js      # Snapshot 26 bài test thực tế để chạy offline/local
-│   └── sample-data.js          # Dữ liệu dự phòng
+│   └── kho-snapshot.js         # Bản dự phòng kho.json (npm run sync-data)
 ├── templates/
 │   ├── sample-laptop-metadata.json   # File mẫu cấu hình máy, màn hình, pin
 │   ├── laptops.csv             # Template tham khảo
@@ -174,9 +122,9 @@ npm install
 Các lệnh chính được cấu hình sẵn:
 - `npm run dev` hoặc `npm start`: Khởi động máy chủ dev Vite tốc độ cao kèm live-reload tại `http://localhost:3000`.
 - `npm run serve`: Chạy máy chủ tĩnh Node.js thuần (zero-dependency, chạy được ngay cả khi chưa tải package).
-- `npm run validate`: Tự động kiểm tra tính hợp lệ của dữ liệu benchmark, metadata JSON, file CSV và snapshot.
+- `npm run validate`: Kiểm tra bản dự phòng kho.json (id bài test, số cột điểm) và các file mẫu.
 - `npm run build`: Đóng gói toàn bộ web tĩnh và dữ liệu vào thư mục `dist/` để sẵn sàng deploy.
-- `npm run sync-data`: Tải và cập nhật snapshot mới nhất từ repo GitHub `tinhte-charts`.
+- `npm run sync-data`: Tải `kho.json` mới nhất về `data/kho-snapshot.js`.
 - `npm run lint`: Kiểm tra chuẩn code JavaScript với ESLint flat config.
 - `npm run format`: Tự động định dạng code bằng Prettier.
 

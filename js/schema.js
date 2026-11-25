@@ -1,10 +1,10 @@
 /*
  * SCHEMA – cách phân loại & hiển thị dữ liệu.
  * ------------------------------------------------------------------
- * 1. Kết quả benchmark lấy TỰ ĐỘNG từ các file biểu đồ trong repo (data/...json).
- *    Bài test được xếp vào nhóm dựa theo tiêu đề biểu đồ (CATEGORIES bên dưới).
- *    Biểu đồ có đơn vị "FPS" tự vào nhóm "Chơi game thực tế".
- * 2. Cấu hình / màn hình / pin lấy từ file thông tin máy (laptops/<tên-thư-mục>.json).
+ * 1. Kết quả benchmark lấy từ kho.json của repo tinhte-charts, theo id bài test (TESTS bên dưới).
+ *    Bài test riêng (game, AI…) khai báo trong mục "tests" của kho.json.
+ *    Bài test được xếp vào nhóm dựa theo tiêu đề (CATEGORIES). Đơn vị "FPS" tự vào nhóm game.
+ * 2. Màn hình / pin: chưa có nguồn, sẽ bổ sung ở bước sau.
  */
 window.LAB = window.LAB || {};
 
@@ -13,7 +13,8 @@ LAB.CATEGORIES = [
   { id: 'cpu', title: 'Hiệu năng CPU', match: /cinebench|geekbench|r23|r26|blender|handbrake|7zip|corona|vray/ },
   { id: 'gpu', title: 'Hiệu năng đồ hoạ', match: /3dmark|timespy|firestrike|steelnomad|wildlife|portroyal|speedway|nightraid|solarbay|gfxbench/ },
   { id: 'games', title: 'Chơi game thực tế', match: /fps|cyberpunk|wukong|valorant|counterstrike|cs2|gta|eldenring|forza|leagueoflegends|dota|pubg|fortnite|apex|starfield|alanwake|hogwarts|reddead|tombraider|witcher/ },
-  { id: 'system', title: 'Hiệu năng tổng thể', match: /pcmark|procyon|crossmark|speedometer|jetstream/ },
+  { id: 'system', title: 'Hiệu năng tổng thể & pin', match: /pcmark|procyon|crossmark|speedometer|jetstream/ },
+  { id: 'ai', title: 'AI chạy cục bộ', match: /ailocal|llm|tokens?/ },
   { id: 'other', title: 'Bài test khác', match: null },
 ];
 
@@ -84,4 +85,38 @@ LAB.STATIC_SECTIONS = [
 ];
 
 // Thứ tự các phần trên trang chi tiết
-LAB.SECTION_ORDER = ['cpu', 'gpu', 'games', 'system', 'other', 'display', 'battery'];
+LAB.SECTION_ORDER = ['cpu', 'gpu', 'games', 'ai', 'system', 'other', 'display', 'battery'];
+
+/*
+ * Danh mục bài test chuẩn – trùng id với Tinhte Chart Studio (core.js → TESTS).
+ * cat: 'cpu' thì biểu đồ ghi tên CPU, 'gpu' thì ghi tên GPU (máy chỉ có iGPU ghi tên iGPU).
+ * Thêm bài mới ở Chart Studio thì thêm vào đây cùng id.
+ */
+(function () {
+  const S2 = ['Đơn nhân', 'Đa nhân'];
+  const HI = 'Điểm càng cao càng tốt';
+  const T = (id, title, cat, o) => Object.assign({ id, title, cat, series: null, unit: 'điểm', sub: HI }, o || {});
+  LAB.TESTS = [
+    T('3dmark-time-spy', '3DMark Time Spy', 'gpu'),
+    T('3dmark-time-spy-extreme', '3DMark Time Spy Extreme', 'gpu'),
+    T('3dmark-fire-strike', '3DMark Fire Strike', 'gpu'),
+    T('3dmark-fire-strike-extreme', '3DMark Fire Strike Extreme', 'gpu'),
+    T('3dmark-fire-strike-ultra', '3DMark Fire Strike Ultra', 'gpu'),
+    T('3dmark-steel-nomad', '3DMark Steel Nomad', 'gpu'),
+    T('3dmark-steel-nomad-light', '3DMark Steel Nomad Light', 'gpu'),
+    T('3dmark-port-royal', '3DMark Port Royal', 'gpu'),
+    T('3dmark-speed-way', '3DMark Speed Way', 'gpu'),
+    T('3dmark-solar-bay', '3DMark Solar Bay', 'gpu'),
+    T('3dmark-wild-life-extreme', '3DMark Wild Life Extreme', 'gpu'),
+    T('cinebench-2026', 'Cinebench 2026', 'cpu', { series: S2 }),
+    T('cinebench-r23', 'Cinebench R23', 'cpu', { series: S2 }),
+    T('cinebench-2024', 'Cinebench 2024', 'cpu', { series: S2 }),
+    T('geekbench-7', 'Geekbench 7', 'cpu', { series: S2 }),
+    T('geekbench-6', 'Geekbench 6', 'cpu', { series: S2 }),
+    T('procyon-office', 'Procyon Office Productivity', 'cpu'),
+    T('procyon-photo', 'Procyon Photo Editing', 'cpu'),
+    T('procyon-video', 'Procyon Video Editing', 'cpu'),
+    T('procyon-battery', 'Procyon Battery Life', 'cpu', { unit: 'phút', sub: 'Thời gian sáng màn hình (phút), càng lâu càng tốt' }),
+    T('pcmark-10', 'PCMark 10', 'cpu'),
+  ];
+})();
