@@ -1,11 +1,10 @@
 /*
- * Đọc & xử lý dữ liệu từ repo GitHub.
+ * Đọc & xử lý dữ liệu benchmark.
  * ------------------------------------------------------------------
- * - Lấy danh sách file qua GitHub API (1–2 request), tải nội dung từ raw.githubusercontent.com
- *   theo commit cố định → lưu cache trong trình duyệt, lần sau chỉ tải file mới/đã sửa.
- * - Nếu GitHub API bị giới hạn: dùng cache cũ, hoặc dự phòng qua jsDelivr CDN.
- * - Mỗi thư mục con trong data/ = 1 máy được review. Máy có "highlight": true trong
- *   biểu đồ là máy chính; các máy còn lại là máy so sánh trong bài.
+ * - Nguồn duy nhất: kho.json ở gốc repo pnghuy/tinhte-charts (kho máy của Tinhte Chart Studio).
+ * - Mỗi máy Tinh tế tự đo (measured) là một thẻ trên web; các dòng số tham khảo chỉ xuất hiện
+ *   trong biểu đồ so sánh và được ghi rõ "tham khảo".
+ * - Biểu đồ so sánh tự dựng từ mọi máy cùng loại có cùng bài test (laptop/PC không lẫn với card rời).
  */
 (function () {
   'use strict';
@@ -101,21 +100,6 @@
     return /^https?:\/\//i.test(u) ? u : '';
   }
 
-  const isTruthy = (v) => v === true || /^(1|x|true|yes|co|có|an|ẩn)$/i.test(String(v == null ? '' : v).trim());
-
-  function mostCommon(arr) {
-    const count = new Map();
-    let best = null;
-    let bestN = 0;
-    arr.forEach((x) => {
-      const k = normalize(x);
-      const n = (count.get(k) || 0) + 1;
-      count.set(k, n);
-      if (n > bestN) { bestN = n; best = x; }
-    });
-    return best;
-  }
-
   /* ================= Nhận diện tên máy / CPU / GPU ================= */
 
   const GPU_RE = /\b(rtx|gtx|geforce|quadro|radeon|arc\s*[a-z]?\d|adreno|iris|graphics)\b/i;
@@ -170,51 +154,6 @@
     return hit ? hit[0] : '';
   }
 
-  // "2026-07-rog-strix-scar-18" → { date: 1/7/2026, label: "07/2026", rest: "rog-strix-scar-18" }
-  function parseFolder(dir) {
-    const last = String(dir || '').split('/').pop();
-    const m = last.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?[-_ ]?(.*)$/);
-    if (!m || +m[2] < 1 || +m[2] > 12) return { date: null, label: '', rest: last };
-    const date = new Date(+m[1], +m[2] - 1, m[3] ? +m[3] : 1);
-    return { date, label: m[3] ? fmtDate(date) : pad2(m[2]) + '/' + m[1], rest: m[4] || '' };
-  }
-
-  const prettyFolder = (s) => String(s || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim();
-
-  /* ================= Nhận diện bài test ================= */
-
-  const ALIASES = {};
-  Object.keys(CFG.testAliases || {}).forEach((k) => { ALIASES[compact(k)] = compact(CFG.testAliases[k]); });
-
-  function testKeyOf(title) {
-    const k = compact(title) || 'khac';
-    return ALIASES[k] || k;
-  }
-
-  function categoryOf(title, unit) {
-    if (/fps/i.test(unit || '')) return 'games';
-    const t = compact(title);
-    const c = LAB.CATEGORIES.find((x) => x.match && x.match.test(t));
-    return c ? c.id : 'other';
-  }
-
-  function seriesKeyOf(label) {
-    const s = slugify(label);
-    if (!s || /^(overall-score|overall|score|diem|diem-tong|tong-diem|ket-qua)$/.test(s)) return 'score';
-    return s;
-  }
-
-  const KNOWN_TESTS = [
-    ['cinebench', 'Cinebench'], ['geekbench', 'Geekbench'], ['pcmark', 'PCMark'], ['procyon', 'Procyon'],
-    ['timespy', 'Time Spy'], ['firestrike', 'Fire Strike'], ['steelnomad', 'Steel Nomad'], ['wildlife', 'Wild Life'],
-    ['cyberpunk', 'Cyberpunk'],
-  ];
-  function knownTest(s) {
-    const t = compact(s);
-    const hit = KNOWN_TESTS.find((k) => t.includes(k[0]));
-    return hit ? hit[1] : null;
-  }
-
   /* ================= Bộ nhớ đệm trình duyệt ================= */
 
   const LS = {
@@ -228,341 +167,237 @@
     },
   };
 
-  /* ================= Tải dữ liệu từ GitHub ================= */
+  /* ================= Tải kho.json từ GitHub ================= */
+  /*
+   * Toàn bộ điểm số lấy từ một file duy nhất: kho.json ở gốc repo tinhte-charts.
+   * Đây là kho máy mà Tinhte Chart Studio đọc/ghi, mỗi máy một dòng với tên đầy đủ,
+   * CPU, GPU, loại thiết bị, cờ "measured" (Tinh tế tự đo) và điểm theo id bài test.
+   * Không đọc các file chart trong data/ nữa: tên máy trong chart có thể bị sửa riêng
+   * cho từng bài (vd bài tài trợ chỉ ghi tên chip), còn kho.json luôn giữ tên gốc.
+   *
+   * Thứ tự thử: raw.githubusercontent.com → jsDelivr → bản đệm trong trình duyệt
+   * → bản snapshot đi kèm web (data/kho-snapshot.js).
+   */
 
   const GH = CFG.github;
   const REPO = GH.owner + '/' + GH.repo;
   const BRANCH = GH.branch || 'main';
-  const DATA_DIR = String(GH.dataDir || 'data').replace(/^\/+|\/+$/g, '');
-  const META_DIR = String(GH.metaDir || 'laptops').replace(/^\/+|\/+$/g, '');
-  const INDEX_KEY = 'lab:index:' + REPO + '@' + BRANCH;
-  const BLOB_PREFIX = 'lab:blob:';
+  const KHO_PATH = String(GH.khoFile || 'kho.json').replace(/^\/+/, '');
+  const CACHE_KEY = 'lab:kho:' + REPO + '@' + BRANCH;
 
-  const encPath = (p) => p.split('/').map(encodeURIComponent).join('/');
-  const isWanted = (p) => /\.json$/i.test(p) && (p.startsWith(DATA_DIR + '/') || p.startsWith(META_DIR + '/'));
-
-  async function getJSON(url) {
-    const res = await fetch(url);
-    if (!res.ok) {
-      const e = new Error('HTTP ' + res.status + (res.status === 403 || res.status === 429 ? ' (GitHub giới hạn lượt truy cập)' : ''));
-      e.status = res.status;
-      throw e;
-    }
+  async function fetchJSON(url) {
+    const res = await fetch(url, { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     return res.json();
   }
 
-  async function loadIndex(force) {
-    const cached = LS.get(INDEX_KEY);
+  async function loadKho(force) {
+    const cached = LS.get(CACHE_KEY);
     const maxAge = (CFG.cacheMinutes == null ? 10 : CFG.cacheMinutes) * 60000;
-    if (!force && cached && cached.source === 'github' && Date.now() - cached.time < maxAge) return cached;
-    try {
-      const br = await getJSON('https://api.github.com/repos/' + REPO + '/branches/' + encodeURIComponent(BRANCH));
-      const sha = br.commit.sha;
-      const commitDate = br.commit.commit && br.commit.commit.committer ? br.commit.commit.committer.date : null;
-      if (cached && cached.source === 'github' && cached.sha === sha) {
-        cached.time = Date.now();
-        LS.set(INDEX_KEY, cached);
-        return cached;
-      }
-      const tree = await getJSON('https://api.github.com/repos/' + REPO + '/git/trees/' + sha + '?recursive=1');
-      const files = tree.tree.filter((t) => t.type === 'blob' && isWanted(t.path)).map((t) => ({ path: t.path, sha: t.sha }));
-      const idx = { source: 'github', sha, commitDate, time: Date.now(), files, truncated: !!tree.truncated };
-      LS.set(INDEX_KEY, idx);
-      return idx;
-    } catch (err) {
-      console.warn('[Laptop Lab] GitHub API lỗi:', err);
-      if (cached) return Object.assign({}, cached, { stale: true, error: err.message });
+    if (!force && cached && Date.now() - cached.time < maxAge) return { kho: cached.kho, source: cached.source, time: cached.time };
+
+    const urls = [
+      ['github', 'https://raw.githubusercontent.com/' + REPO + '/' + encodeURIComponent(BRANCH) + '/' + KHO_PATH],
+      ['jsdelivr', 'https://cdn.jsdelivr.net/gh/' + REPO + '@' + encodeURIComponent(BRANCH) + '/' + KHO_PATH],
+    ];
+    let lastErr = null;
+    for (const [source, url] of urls) {
       try {
-        const list = await getJSON('https://data.jsdelivr.com/v1/packages/gh/' + REPO + '@' + encodeURIComponent(BRANCH) + '?structure=flat');
-        const files = (list.files || [])
-          .map((f) => ({ path: String(f.name).replace(/^\/+/, ''), sha: 'jsd-' + f.hash }))
-          .filter((f) => isWanted(f.path));
-        return { source: 'jsdelivr', sha: null, time: Date.now(), files, stale: true, error: err.message };
-      } catch (err2) {
-        if (window.LAB && window.LAB.GITHUB_SNAPSHOT) {
-          const snap = window.LAB.GITHUB_SNAPSHOT;
-          const files = Object.keys(snap).map((k) => ({ path: k, sha: 'snap-' + slugify(k) }));
-          return { source: 'snapshot', sha: 'snapshot', time: Date.now(), files, stale: true, error: err.message };
-        }
-        throw err;
+        const kho = await fetchJSON(url);
+        if (!kho || typeof kho.devices !== 'object') throw new Error('kho.json không có "devices"');
+        LS.set(CACHE_KEY, { kho, source, time: Date.now() });
+        return { kho, source, time: Date.now() };
+      } catch (e) {
+        lastErr = e;
+        console.warn('[Laptop Lab] Không tải được kho từ ' + source + ':', e);
       }
     }
+    if (cached) return { kho: cached.kho, source: cached.source, time: cached.time, stale: true, error: lastErr && lastErr.message };
+    if (LAB.KHO_SNAPSHOT) return { kho: LAB.KHO_SNAPSHOT, source: 'snapshot', time: null, stale: true, error: lastErr && lastErr.message };
+    throw lastErr || new Error('Không tải được kho.json');
   }
 
-  function fileUrl(idx, path) {
-    if (idx.source === 'github' && idx.sha) return 'https://raw.githubusercontent.com/' + REPO + '/' + idx.sha + '/' + encPath(path);
-    return 'https://cdn.jsdelivr.net/gh/' + REPO + '@' + encodeURIComponent(BRANCH) + '/' + encPath(path);
-  }
+  /* ================= Danh mục bài test ================= */
 
-  async function loadFiles(idx, onProgress) {
-    const files = idx.files;
-    const out = new Array(files.length);
-    let next = 0;
-    let done = 0;
-    async function worker() {
-      while (next < files.length) {
-        const n = next++;
-        const f = files[n];
-        const key = BLOB_PREFIX + f.sha;
-        let text = null;
-        if (idx.source === 'snapshot' && window.LAB && window.LAB.GITHUB_SNAPSHOT) {
-          const snapData = window.LAB.GITHUB_SNAPSHOT[f.path];
-          if (snapData != null) text = typeof snapData === 'string' ? snapData : JSON.stringify(snapData);
-        }
-        if (text == null) {
-          try { text = localStorage.getItem(key); } catch (e) { /* bỏ qua */ }
-        }
-        if (text == null) {
-          try {
-            const res = await fetch(fileUrl(idx, f.path));
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            text = await res.text();
-            try { localStorage.setItem(key, text); } catch (e) { /* bỏ qua */ }
-          } catch (e) {
-            if (window.LAB && window.LAB.GITHUB_SNAPSHOT && window.LAB.GITHUB_SNAPSHOT[f.path]) {
-              const snapData = window.LAB.GITHUB_SNAPSHOT[f.path];
-              text = typeof snapData === 'string' ? snapData : JSON.stringify(snapData);
-            } else {
-              out[n] = { path: f.path, error: 'Không tải được file (' + e.message + ')' };
-            }
-          }
-        }
-        if (text != null) out[n] = { path: f.path, text };
-        done++;
-        if (onProgress) onProgress(done, files.length);
-      }
-    }
-    await Promise.all(Array.from({ length: Math.min(8, files.length) }, worker));
-    // Dọn cache của các file đã bị xoá / sửa
-    const keep = new Set(files.map((f) => BLOB_PREFIX + f.sha));
-    LS.keys(BLOB_PREFIX).forEach((k) => { if (!keep.has(k)) LS.del(k); });
-    return out;
-  }
-
-  function parseJSON(text) {
-    if (typeof text === 'object' && text !== null) return { data: text };
-    text = String(text).replace(/^\uFEFF/, '');
-    try { return { data: JSON.parse(text) }; } catch (e1) {
-      try {
-        return { data: JSON.parse(text.replace(/,(\s*[}\]])/g, '$1')), warning: 'Có dấu phẩy thừa trước } hoặc ] – web vẫn đọc được nhưng công cụ render video có thể báo lỗi.' };
-      } catch (e2) {
-        return { error: e1.message };
-      }
-    }
-  }
-
-  /* ================= Thông tin máy (laptops/*.json) ================= */
-
-  // Làm phẳng: { display: { size: 16 } } → { display_size: 16 }
-  function flattenMeta(meta) {
-    const raw = {};
-    Object.keys(meta || {}).forEach((k) => {
-      const v = meta[k];
-      if (v && typeof v === 'object' && !Array.isArray(v)) {
-        Object.keys(v).forEach((k2) => { raw[k.toLowerCase() + '_' + k2.toLowerCase()] = v[k2]; });
-      } else raw[k.toLowerCase()] = v;
+  // Bài test chuẩn (id giống Tinhte Chart Studio) + bài test riêng khai báo trong kho.tests
+  function buildTests(kho) {
+    const tests = {};
+    (LAB.TESTS || []).forEach((t) => { tests[t.id] = Object.assign({}, t); });
+    Object.keys(kho.tests || {}).forEach((id) => {
+      tests[id] = Object.assign({ id, unit: 'điểm' }, tests[id] || {}, kho.tests[id], { id });
     });
-    if (raw.charger_w != null && raw.battery_charger_w == null) raw.battery_charger_w = raw.charger_w;
-    Object.keys(raw).forEach((k) => { if (raw[k] != null && typeof raw[k] !== 'string') raw[k] = String(raw[k]); });
-    return raw;
+    Object.values(tests).forEach((t) => {
+      t.series = Array.isArray(t.series) && t.series.length ? t.series.map(String) : null;
+      t.lowerBetter = !!t.lower || /thap.*tot|lower.*better/.test(normalize(t.sub || ''));
+      t.category = categoryOf(t.title, t.unit);
+    });
+    return tests;
   }
 
-  function staticNumeric(meta, raw) {
-    const t = meta.type || 'number';
-    if (t === 'text') return null;
-    if (t === 'duration') return parseDuration(raw);
-    return toNumber(raw);
+  function categoryOf(title, unit) {
+    if (/fps/i.test(unit || '')) return 'games';
+    const t = compact(title);
+    const c = LAB.CATEGORIES.find((x) => x.match && x.match.test(t));
+    return c ? c.id : 'other';
   }
+
+  function seriesKeys(test) {
+    if (!test.series) return [{ label: /fps/i.test(test.unit || '') ? 'FPS' : 'Điểm', key: 'score' }];
+    const used = {};
+    return test.series.map((label, i) => {
+      let key = slugify(label) || 's' + (i + 1);
+      if (used[key]) key += '-' + (i + 1);
+      used[key] = true;
+      return { label, key };
+    });
+  }
+
+  /* ================= Tên hiển thị ================= */
+
+  // Giống quy tắc của Chart Studio: laptop/PC ghi kèm chip trong ngoặc, bài đồ hoạ ghi GPU,
+  // bài CPU ghi CPU. Dòng tham khảo theo chip (chipOnly) chỉ hiện tên chip.
+  function chipOf(dev, test) {
+    const gpuTest = test.cat ? test.cat === 'gpu' : test.category !== 'cpu' && test.category !== 'system';
+    return gpuTest ? dev.gpu || dev.cpu : dev.cpu || dev.gpu;
+  }
+  function deviceLabel(dev, test) {
+    if (dev.type === 'gpu' || dev.type === 'cpu') return dev.name;
+    const chip = chipOf(dev, test);
+    if (dev.chipOnly) return chip ? (dev.note ? chip + ' (' + dev.note + ')' : chip) : dev.name;
+    if (!chip) return dev.name;
+    const inner = chip.replace(/\s*\(([^()]*)\)$/, ', $1');
+    return dev.name + ' (' + inner + ')';
+  }
+
+  // Laptop và PC so với nhau; card đồ hoạ rời, CPU desktop đứng riêng
+  const groupOf = (type) => (type === 'gpu' ? 'gpu' : type === 'cpu' ? 'cpu' : 'system');
 
   /* ================= Dựng cơ sở dữ liệu ================= */
 
   LAB.loadData = async function (opts) {
     opts = opts || {};
-    const idx = await loadIndex(opts.force);
-    const files = await loadFiles(idx, opts.onProgress);
+    const loaded = await loadKho(opts.force);
+    const kho = loaded.kho;
+    const TESTS = buildTests(kho);
 
     const issues = [];
     const addIssue = (level, path, msg) => issues.push({ level, path, msg });
-    if (idx.truncated) addIssue('error', '', 'Repo quá lớn, GitHub trả về danh sách file không đầy đủ.');
 
-    // --- 1. Đọc file ---
-    const rawCharts = [];
-    const metas = {};
-    files.forEach((f) => {
-      if (!f) return;
-      if (f.error) { addIssue('error', f.path, f.error); return; }
-      const p = parseJSON(f.text);
-      if (p.error) { addIssue('error', f.path, 'File JSON bị lỗi cú pháp nên bị bỏ qua: ' + p.error); return; }
-      if (p.warning) addIssue('warn', f.path, p.warning);
-      if (f.path.startsWith(META_DIR + '/')) {
-        const id = slugify(f.path.slice(META_DIR.length + 1).replace(/\.json$/i, ''));
-        metas[id] = { data: p.data || {}, path: f.path, used: false };
-        return;
-      }
-      const rel = f.path.slice(DATA_DIR.length + 1);
-      const cut = rel.lastIndexOf('/');
-      rawCharts.push({ path: f.path, dir: cut >= 0 ? rel.slice(0, cut) : '', file: rel.slice(cut + 1), data: p.data });
-    });
-
-    // --- 2. Chuẩn hoá biểu đồ & nhóm theo máy ---
-    const groups = {};
-    rawCharts.forEach((c) => {
-      const d = c.data;
-      if (!d || !Array.isArray(d.items)) { addIssue('warn', c.path, 'Không có danh sách "items" – bỏ qua.'); return; }
-      const title = String(d.title || c.file.replace(/\.json$/i, '')).trim();
-      const unit = String(d.unit || '').trim();
-      const subtitle = String(d.subtitle || '').trim();
-      const lowerBetter = /thap.*tot|lower.*better/.test(normalize(subtitle));
-      const labels = Array.isArray(d.series) ? d.series.map((s) => String(s)) : [];
-
-      const items = d.items
-        .filter((it) => it && it.name != null)
-        .map((it) => ({
-          name: String(it.name).trim(),
-          values: (Array.isArray(it.values) ? it.values : [it.value]).map(toNumber),
-          highlight: isTruthy(it.highlight),
-        }));
-      if (!items.length) { addIssue('warn', c.path, 'Biểu đồ không có máy nào – bỏ qua.'); return; }
-
-      const n = Math.max(labels.length, ...items.map((i) => i.values.length), 1);
-      const usedKeys = {};
-      const series = Array.from({ length: n }, (_, i) => {
-        const label = labels[i] || (n === 1 ? (/fps/i.test(unit) ? 'FPS' : 'Điểm') : 'Kết quả ' + (i + 1));
-        let key = labels[i] ? seriesKeyOf(label) : n === 1 ? 'score' : 's' + (i + 1);
-        if (usedKeys[key]) key += '-' + (i + 1);
-        usedKeys[key] = true;
-        return { label, key };
+    // --- 1. Chuẩn hoá danh sách máy trong kho ---
+    const devices = [];
+    Object.keys(kho.devices || {}).forEach((id) => {
+      const d = kho.devices[id] || {};
+      const name = String(d.name || '').trim();
+      if (!name) { addIssue('warn', id, 'Máy không có tên, bỏ qua.'); return; }
+      const scores = {};
+      Object.keys(d.scores || {}).forEach((tid) => {
+        const t = TESTS[tid];
+        if (!t) { addIssue('warn', id, 'Bài test "' + tid + '" chưa khai báo trong kho.tests, bỏ qua điểm này.'); return; }
+        const vals = (Array.isArray(d.scores[tid]) ? d.scores[tid] : [d.scores[tid]]).map(toNumber);
+        const need = t.series ? t.series.length : 1;
+        if (vals.length !== need || vals.some((v) => v == null)) {
+          addIssue('warn', id, '"' + name + '" có điểm ' + t.title + ' sai số cột (cần ' + need + '), bỏ qua.');
+          return;
+        }
+        scores[tid] = vals;
       });
-
-      const chart = {
-        path: c.path, file: c.file, dir: c.dir, title, subtitle, unit, lowerBetter,
-        testKey: testKeyOf(title), category: categoryOf(title, unit), series, items,
-        decimals: typeof d.decimals === 'number' ? d.decimals : null,
-      };
-
-      const names = items.map((i) => normalize(i.name));
-      const dupIdx = names.findIndex((nm, i) => names.indexOf(nm) !== i);
-      if (dupIdx >= 0) addIssue('warn', c.path, 'Có 2 máy trùng tên "' + items[dupIdx].name + '" trong cùng biểu đồ – nên ghi thêm năm/đời máy để người đọc phân biệt.');
-
-      const ft = knownTest(c.file);
-      const tt = knownTest(title);
-      if (ft && tt && ft !== tt) addIssue('warn', c.path, 'Tên file gợi ý bài test "' + ft + '" nhưng tiêu đề biểu đồ là "' + title + '" – kiểm tra xem có nhầm tiêu đề hay số liệu không.');
-
-      const hl = items.find((i) => i.highlight);
-      if (!hl) { addIssue('warn', c.path, 'Không có máy nào "highlight": true nên không biết đây là kết quả của máy nào – biểu đồ chưa được đưa lên web.'); return; }
-
-      const gid = c.dir ? 'd:' + c.dir : 'r:' + slugify(splitName(hl.name).base || hl.name);
-      (groups[gid] = groups[gid] || { gid, dir: c.dir, charts: [] }).charts.push(chart);
+      devices.push({
+        id, name,
+        cpu: cleanHw(d.cpu || ''), gpu: cleanHw(d.gpu || ''),
+        type: d.type || 'laptop',
+        group: groupOf(d.type || 'laptop'),
+        measured: d.measured === true,
+        chipOnly: d.chipOnly === true,
+        note: d.note || '',
+        scores,
+      });
     });
 
-    // Phát hiện số liệu bị copy nhầm giữa các biểu đồ trong cùng 1 bài
-    Object.values(groups).forEach((g) => {
-      const sigs = {};
-      g.charts.forEach((ch) => ch.series.forEach((s, si) => {
-        const vals = ch.items.map((it) => it.values[si]);
-        if (vals.filter((v) => v != null).length < 2) return;
-        const sig = vals.join('|');
-        const prev = sigs[sig];
-        if (prev && prev.ch !== ch && prev.ch.testKey !== ch.testKey) {
-          addIssue('warn', ch.path, 'Số liệu "' + ch.title + ' – ' + s.label + '" giống hệt "' + prev.ch.title + ' – ' + prev.label + '" (' + prev.ch.file + '). Nhiều khả năng bị copy nhầm.');
-        } else if (!prev) sigs[sig] = { ch, label: s.label };
-      }));
+    // --- 2. Chọn máy hiện thành thẻ cho member ---
+    // Laptop/PC do Tinh tế tự đo, có tên máy thật (không phải dòng chỉ ghi tên chip).
+    const isCard = (d) => d.measured && !d.chipOnly && (d.type === 'laptop' || d.type === 'desktop') && !classify(d.name);
+    const cards = devices.filter(isCard);
+
+    // Dòng số tham khảo trùng tên + chip với một máy đã đo thì gộp vào máy đó
+    const sameMachine = (a, b) => normalize(a.name) === normalize(b.name) && normalize(a.cpu) === normalize(b.cpu) && normalize(a.gpu) === normalize(b.gpu);
+    devices.forEach((d) => {
+      if (d.measured || d.chipOnly) return;
+      const host = cards.find((c) => sameMachine(c, d));
+      if (!host) return;
+      d.mergedInto = host.id;
+      host.refScores = host.refScores || {};
+      Object.keys(d.scores).forEach((tid) => { if (!host.scores[tid]) host.refScores[tid] = d.scores[tid]; });
     });
+
+    const cardNames = {};
+    cards.forEach((c) => { const k = normalize(c.name); cardNames[k] = (cardNames[k] || 0) + 1; });
 
     // --- 3. Danh mục metric ---
     const METRICS = {};
-    const testTitles = {};
     LAB.SPECS.concat(...LAB.STATIC_SECTIONS.map((s) => [].concat(...s.groups.map((g) => g.metrics.map((m) => Object.assign({ category: s.id, groupTitle: s.title }, m))))))
       .forEach((m) => { METRICS[m.key] = Object.assign({ category: m.category || 'specs' }, m); });
 
-    // --- 4. Dựng danh sách máy ---
-    const laptops = [];
-    Object.values(groups).forEach((g) => {
-      const splits = g.charts.map((ch) => splitName(ch.items.find((i) => i.highlight).name));
-      const folder = parseFolder(g.dir);
-      const autoName = mostCommon(splits.map((s) => s.base).filter(Boolean)) || prettyFolder(folder.rest || g.dir);
-      const hw = [].concat(...splits.map((s) => s.hw)).map(cleanHw);
-      const id = g.dir ? slugify(g.dir) : g.gid.slice(2);
-
-      const metaEntry = metas[id];
-      if (metaEntry) metaEntry.used = true;
-      const raw = flattenMeta(metaEntry ? metaEntry.data : {});
-      if (isTruthy(raw.hidden)) return;
-
-      raw.cpu = raw.cpu || mostCommon(hw.filter((h) => classify(h) === 'cpu')) || '';
-      raw.gpu = raw.gpu || mostCommon(hw.filter((h) => classify(h) === 'gpu')) || '';
-      const name = raw.name || autoName;
-      const metaDate = parseDate(raw.test_date);
-
-      const l = {
-        id, dir: g.dir, raw, v: {},
-        name,
-        brand: raw.brand || detectBrand(name + ' ' + g.dir),
-        model: raw.model || '',
-        tester: raw.tester || '',
-        date: metaDate || folder.date,
-        dateLabel: metaDate ? fmtDate(metaDate) : folder.label,
-        image: safeUrl(raw.image_url),
-        review: safeUrl(raw.review_url),
-        notes: raw.notes || '',
-        hasMeta: !!metaEntry,
-        metaPath: META_DIR + '/' + id + '.json',
-        charts: g.charts.slice().sort((a, b) => a.title.localeCompare(b.title, 'vi')),
+    // --- 4. Biểu đồ so sánh cho từng bài test của một máy ---
+    function buildChart(dev, tid, ref) {
+      const t = TESTS[tid];
+      const sk = seriesKeys(t);
+      const mainIdx = sk.length - 1; // xếp theo cột cuối (vd Đa nhân), giống chart trong bài
+      const pool = devices.filter((d) => d.group === dev.group && d.scores[tid] && d.id !== dev.id && !d.mergedInto);
+      const self = { name: deviceLabel(dev, t), values: (ref ? dev.refScores : dev.scores)[tid], highlight: true, ref: !!ref, measured: !ref };
+      const items = [self].concat(pool.map((d) => ({ name: deviceLabel(d, t), values: d.scores[tid], highlight: false, ref: !d.measured, measured: d.measured, id: isCard(d) ? d.id : null })));
+      items.sort((a, b) => (t.lowerBetter ? a.values[mainIdx] - b.values[mainIdx] : b.values[mainIdx] - a.values[mainIdx]));
+      // Thứ hạng chỉ tính trên các máy Tinh tế tự đo
+      const measuredItems = items.filter((it) => it.measured);
+      const rank = self.measured ? { rank: measuredItems.indexOf(self) + 1, total: measuredItems.length } : null;
+      return {
+        testKey: tid, title: t.title, subtitle: t.sub || '', unit: t.unit || '', lowerBetter: t.lowerBetter,
+        category: t.category, series: sk, items, rank, ref: !!ref, decimals: null,
       };
+    }
 
-      // Số liệu tĩnh (màn hình, pin…)
-      Object.keys(METRICS).forEach((k) => {
-        const val = staticNumeric(METRICS[k], raw[k]);
-        if (val != null) l.v[k] = val;
-      });
-
-      // Số liệu benchmark: lấy giá trị của máy "highlight"
-      l.charts.forEach((ch) => {
-        const h = ch.items.find((i) => i.highlight);
-        const firstKey = ch.testKey + '.' + ch.series[0].key;
-        if (firstKey in l.v) {
-          ch.duplicate = true;
-          addIssue('warn', ch.path, 'Máy này đã có biểu đồ khác cùng bài test "' + ch.title + '" – biểu đồ này không được tính vào xếp hạng.');
-          return;
-        }
+    // --- 5. Dựng danh sách máy cho giao diện ---
+    const laptops = cards.map((dev) => {
+      const charts = Object.keys(dev.scores).map((tid) => buildChart(dev, tid, false))
+        .concat(Object.keys(dev.refScores || {}).map((tid) => buildChart(dev, tid, true)))
+        .sort((a, b) => LAB.SECTION_ORDER.indexOf(a.category) - LAB.SECTION_ORDER.indexOf(b.category) || a.title.localeCompare(b.title, 'vi'));
+      const raw = { cpu: dev.cpu, gpu: dev.gpu };
+      const l = {
+        id: dev.id, dev, raw, v: {},
+        name: dev.name,
+        // Nhiều cấu hình cùng tên (vd Acer Nitro ProPanel 3050/4050/5050): thêm chip vào tên hiển thị
+        variant: cardNames[normalize(dev.name)] > 1 ? [dev.cpu, dev.gpu].filter(Boolean).join(' · ') : '',
+        brand: detectBrand(dev.name),
+        model: '', tester: '', date: null, dateLabel: '', image: '', review: '', notes: '',
+        charts,
+      };
+      charts.forEach((ch) => {
+        if (ch.ref) return;
+        const hl = ch.items.find((i) => i.highlight);
         ch.series.forEach((s, si) => {
-          const val = h.values[si];
-          if (val == null) return;
           const key = ch.testKey + '.' + s.key;
-          l.v[key] = val;
-          (testTitles[ch.testKey] = testTitles[ch.testKey] || []).push(ch.title);
+          l.v[key] = hl.values[si];
           if (!METRICS[key]) {
-            METRICS[key] = { key, dynamic: true, testKey: ch.testKey, seriesKey: s.key, label: s.label, unit: ch.unit, lowerBetter: ch.lowerBetter, decimals: ch.decimals, category: ch.category };
+            const t = TESTS[ch.testKey];
+            METRICS[key] = {
+              key, dynamic: true, testKey: ch.testKey, seriesKey: s.key, label: s.label, unit: t.unit, lowerBetter: t.lowerBetter,
+              category: t.category, testTitle: t.title, groupTitle: t.title,
+              fullLabel: s.key === 'score' ? t.title : t.title + ' – ' + s.label,
+            };
           }
         });
       });
-
-      l.testCount = l.charts.filter((c) => !c.duplicate).length;
-      l.search = normalize([name, l.brand, l.model, raw.cpu, raw.gpu, g.dir, raw.display_panel].concat(g.charts.map((ch) => ch.items.find((i) => i.highlight).name)).join(' '));
-      laptops.push(l);
-    });
-
-    // Tiêu đề hiển thị của từng bài test = tiêu đề xuất hiện nhiều nhất
-    Object.values(METRICS).forEach((m) => {
-      if (!m.dynamic) return;
-      m.testTitle = mostCommon(testTitles[m.testKey] || [m.testKey]);
-      m.groupTitle = m.testTitle;
-      m.fullLabel = m.seriesKey === 'score' ? m.testTitle : m.testTitle + ' – ' + m.label;
+      l.testCount = charts.length;
+      l.search = normalize([dev.name, l.brand, dev.cpu, dev.gpu].concat(charts.map((c) => c.title)).join(' '));
+      return l;
     });
     Object.values(METRICS).forEach((m) => { if (!m.dynamic) m.fullLabel = (m.groupTitle && m.category !== 'specs' ? m.groupTitle + ' – ' : '') + m.label; });
 
-    Object.values(metas).forEach((m) => {
-      if (!m.used) addIssue('warn', m.path, 'File thông tin không khớp với thư mục nào trong ' + DATA_DIR + '/ – tên file phải trùng tên thư mục chứa biểu đồ của máy.');
-    });
-
-    // --- 5. Thống kê để xếp hạng ---
+    // --- 6. Thống kê để sắp xếp & xếp hạng trên trang chủ (chỉ máy Tinh tế đo) ---
     const stats = {};
     Object.keys(METRICS).forEach((k) => {
       const vals = laptops.map((l) => l.v[k]).filter((x) => x != null);
       if (vals.length) stats[k] = { values: vals, max: Math.max(...vals), min: Math.min(...vals) };
     });
-
-    // Các kiểu sắp xếp: chỉ những bài test có từ 2 máy trở lên
     const catOrder = LAB.SECTION_ORDER;
     const sorts = Object.values(METRICS)
       .filter((m) => !m.noRank && m.type !== 'text' && stats[m.key] && stats[m.key].values.length >= 2)
@@ -572,10 +407,11 @@
     const byId = {};
     laptops.forEach((l) => { byId[l.id] = l; });
 
-    return { laptops, byId, stats, metrics: METRICS, sorts, issues, index: idx, repo: REPO, branch: BRANCH, metaDir: META_DIR, dataDir: DATA_DIR };
+    const index = { source: loaded.source, stale: !!loaded.stale, error: loaded.error, commitDate: kho.updated || null };
+    return { laptops, byId, devices, tests: TESTS, stats, metrics: METRICS, sorts, issues, index, repo: REPO, branch: BRANCH, khoPath: KHO_PATH };
   };
 
-  LAB.clearIndexCache = function () { LS.del(INDEX_KEY); };
+  LAB.clearIndexCache = function () { LS.del(CACHE_KEY); };
 
   // Thứ hạng & % thanh so sánh của 1 giá trị
   LAB.rankOf = function (db, key, value) {
