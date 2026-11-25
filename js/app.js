@@ -19,17 +19,13 @@
     showIssues: false,
   };
 
-  const SERIES_COLORS = ['#2f7cf6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
+  // Màu theo nhận diện Tinh tế (xanh dương, xanh lá) như chart trong bài viết
+  const SERIES_COLORS = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)'];
 
-  const PLACEHOLDER =
-    '<svg class="ph" viewBox="0 0 64 64" aria-hidden="true"><rect x="12" y="16" width="40" height="26" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M6 48h52" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
-
+  // Chưa có ảnh máy thì không chừa ô trống
   function thumb(l, cls) {
-    return (
-      '<div class="' + cls + '">' + PLACEHOLDER +
-      (l.image ? '<img src="' + esc(l.image) + '" alt="' + esc(l.name) + '" loading="lazy" onerror="this.remove()">' : '') +
-      '</div>'
-    );
+    if (!l.image) return '';
+    return '<div class="' + cls + '"><img src="' + esc(l.image) + '" alt="' + esc(l.name) + '" loading="lazy" onerror="this.parentNode.remove()"></div>';
   }
 
   /* ---------- Định tuyến Hash ---------- */
@@ -147,7 +143,6 @@
       thumb(l, 'card-thumb') +
       '<div class="card-body">' +
       '<div class="card-title">' + esc(l.name) + '</div>' +
-      (l.variant ? '<div class="card-variant muted">' + esc(l.variant) + '</div>' : '') +
       '<div class="card-spec">' +
       (r.cpu ? '<div><span>CPU</span> ' + esc(r.cpu) + '</div>' : '') +
       (r.gpu ? '<div><span>GPU</span> ' + esc(r.gpu) + '</div>' : '') +
@@ -199,29 +194,26 @@
       )
       .join('');
 
-    // Trạng thái nguồn dữ liệu GitHub
-    const syncStatus =
-      '<div class="sync-bar">' +
-      '<div class="sync-info">' +
-      '<span class="sync-dot' + (DB.index.stale ? ' warn' : '') + '"></span>' +
-      '<span>Nguồn: <b><a href="https://github.com/' + esc(DB.repo) + '/blob/' + esc(DB.branch) + '/' + esc(DB.khoPath) + '" target="_blank" rel="noopener">' + esc(DB.repo) + ' · ' + esc(DB.khoPath) + '</a></b>' +
-      (DB.index.commitDate ? ' · Cập nhật ' + esc(U.fmtDate(U.parseDate(DB.index.commitDate))) : '') +
-      (DB.index.stale ? ' (Bản đệm)' : '') +
-      '</span>' +
-      '</div>' +
-      '<div style="display:flex;gap:8px;align-items:center;">' +
-      (DB.issues && DB.issues.length
-        ? '<button type="button" class="sync-btn" id="toggleIssues" style="color:#f59e0b;">' +
-          DB.issues.length +
-          ' lưu ý dữ liệu</button>'
-        : '') +
-      '<button type="button" class="sync-btn" id="refreshBtn">🔄 Làm mới dữ liệu</button>' +
-      '</div>' +
-      '</div>';
+    // Dòng nguồn & lưu ý dữ liệu: chỉ hiện cho người quản lý khi mở với ?debug=1 (vd #/?debug=1)
+    const debug = parseHash().params.get('debug') === '1';
+    const syncStatus = debug
+      ? '<div class="sync-bar">' +
+        '<div class="sync-info">' +
+        '<span class="sync-dot' + (DB.index.stale ? ' warn' : '') + '"></span>' +
+        '<span>Nguồn: <b><a href="https://github.com/' + esc(DB.repo) + '/blob/' + esc(DB.branch) + '/' + esc(DB.khoPath) + '" target="_blank" rel="noopener">' + esc(DB.repo) + ' · ' + esc(DB.khoPath) + '</a></b>' +
+        (DB.index.stale ? ' (bản đệm' + (DB.index.error ? ': ' + esc(DB.index.error) : '') + ')' : '') +
+        '</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+        (DB.issues && DB.issues.length ? '<button type="button" class="sync-btn" id="toggleIssues" style="color:#f59e0b;">' + DB.issues.length + ' lưu ý dữ liệu</button>' : '') +
+        '<button type="button" class="sync-btn" id="refreshBtn">Tải lại dữ liệu</button>' +
+        '</div>' +
+        '</div>'
+      : '';
 
     // Hộp cảnh báo dữ liệu nếu reviewer muốn xem
     let issuesBox = '';
-    if (DB.issues && DB.issues.length && state.showIssues) {
+    if (debug && DB.issues && DB.issues.length && state.showIssues) {
       const issueItems = DB.issues
         .map(
           (it) =>
@@ -244,10 +236,10 @@
       issuesBox +
       '<section class="hero">' +
       '<h1>Tra cứu kết quả test laptop</h1>' +
-      '<p>Điểm benchmark CPU, GPU, game và pin do Tinh tế tự đo trên các máy đã review.</p>' +
+      '<p>Điểm CPU, đồ hoạ, game và pin do Tinh tế tự đo trên các máy đã review, so sánh trực tiếp với nhau.</p>' +
       '<label class="search">' +
       '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
-      '<input id="q" type="search" autocomplete="off" placeholder="Tìm tên máy, hãng, CPU, GPU, hoặc bài test… (vd: zephyrus, scar 18, ultra 9)" value="' +
+      '<input id="q" type="search" autocomplete="off" placeholder="Tìm máy, hãng, CPU, GPU… (vd: zenbook, rtx 5090)" value="' +
       esc(state.q) +
       '">' +
       '</label>' +
@@ -393,18 +385,13 @@
             }
             pct = Math.max(4, Math.min(100, pct));
             const barColor = isMultiSeries ? SERIES_COLORS[sIdx % SERIES_COLORS.length] : isHl ? 'var(--accent)' : 'var(--muted)';
-            const seriesLabel = isMultiSeries ? '<small class="muted" style="margin-right:6px;">' + esc(s.label) + '</small>' : '';
 
             return (
-              '<div class="chart-bar-line">' +
+              '<div class="chart-bar-line" title="' + esc(s.label) + '">' +
               '<div class="chart-track">' +
               '<div class="chart-fill" style="width:' + pct.toFixed(1) + '%;background:' + barColor + ';"></div>' +
               '</div>' +
-              '<div class="chart-val">' +
-              seriesLabel +
-              esc(U.fmtNumber(v, ch.decimals)) +
-              (ch.unit ? ' <small>' + esc(ch.unit) + '</small>' : '') +
-              '</div>' +
+              '<div class="chart-val">' + esc(U.fmtNumber(v, ch.decimals)) + '</div>' +
               '</div>'
             );
           })
@@ -605,6 +592,8 @@
   LAB.loadData()
     .then((db) => {
       DB = db;
+      const src = document.getElementById('dataSource');
+      if (src) src.textContent = DB.laptops.length + ' máy' + (DB.index.commitDate ? ' · Dữ liệu cập nhật ' + U.fmtDate(U.parseDate(DB.index.commitDate)) : '');
       window.addEventListener('hashchange', route);
       route();
     })
