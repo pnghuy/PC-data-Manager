@@ -40,7 +40,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-padding-top: 76px; }
+html { scroll-padding-top: 124px; }
 body {
   margin: 0;
   background: var(--bg);
@@ -587,6 +587,8 @@ main.container { flex: 1; padding-top: 24px; padding-bottom: 48px; }
   .detail-hero { padding: 16px; }
   .chart-card { padding: 14px 12px 10px; }
   .chart-item { grid-template-columns: minmax(0, 1fr); padding: 9px 8px; }
+  .chart-item-head { align-items: flex-start; }
+  .chart-item-name { justify-content: flex-start; }
   .chart-bar-line { grid-template-columns: minmax(0, 1fr) 64px; }
   .toolbar { margin-top: 12px; }
   .sort { width: 100%; }
