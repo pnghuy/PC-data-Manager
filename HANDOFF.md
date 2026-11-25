@@ -7,22 +7,21 @@ Luật chung của repo xem ở `AGENTS.md`.
 
 ## Trạng thái hiện tại
 
-- **Cập nhật lần cuối:** 2026-11-25, Claude
+- **Cập nhật lần cuối:** 2026-11-25, Antigravity
 - **`main` đang có:**
   - App đọc `kho.json` và `laptops.json` của tinhte-charts, hiện 32 máy
   - Giao diện public theo màu Tinh tế, biểu đồ dạng hàng, có số tham khảo
   - So sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
-- **PR đang mở:** không có (sau khi PR bàn giao này được merge)
+- **PR đang mở:** `setup-deploy` (gọn `dist/` + kiểm tra đủ file bắt buộc + `.nojekyll`, thêm workflow GitHub Pages `.github/workflows/deploy-pages.yml`, cập nhật hướng dẫn deploy Cloudflare Pages / GitHub Pages trong `README.md`)
 - **Chưa làm:**
-  - Deploy public (Cloudflare Pages hoặc GitHub Pages)
+  - Kích hoạt deploy public (kết nối Cloudflare Pages hoặc bật GitHub Pages) và gắn tên miền
   - Ảnh máy và link bài review trong `laptops.json`: hầu hết máy chưa có, cần anh cung cấp
 
 ## Việc tiếp theo (theo thứ tự)
 
-1. **Deploy**
-   - Kiểm tra `npm run build` ra `dist/` chạy được: đủ `js/`, `assets/`, `data/`.
-   - Thêm hướng dẫn hoặc workflow deploy cho Cloudflare Pages hoặc GitHub Pages.
-   - Anh chọn tên miền.
+1. **Kích hoạt deploy và gắn tên miền (cần anh thao tác sau khi merge PR `setup-deploy`)**
+   - Chọn Cloudflare Pages (Build command `npm run build`, output `dist`) hoặc GitHub Pages (**Settings → Pages → Source: GitHub Actions**), xem hướng dẫn chi tiết ở mục 5 `README.md`.
+   - Chọn và gắn tên miền riêng (ví dụ `laptop.tinhte.vn` hoặc `lab.tinhte.vn`).
 2. **Bổ sung `laptops.json` ở tinhte-charts**
    - Điền `review_url`, `image_url`, màn hình, pin cho các máy đã có bài review.
    - Chỉ điền số có thật.
@@ -88,3 +87,4 @@ Muốn làm việc khác thì thay nửa sau của câu bằng việc cụ thể
 | 2026-11-25 | Claude | PR #3: giao diện public |
 | 2026-11-25 | Claude | PR #4: so sánh nhiều máy, tab bài cùng họ, tải PNG |
 | 2026-11-25 | Claude | PR bàn giao: AGENTS.md, HANDOFF.md |
+| 2026-11-25 | Antigravity | Chuẩn bị deploy: kiểm tra `dist/`, thêm workflow GitHub Pages, cập nhật hướng dẫn Cloudflare/GitHub Pages |
