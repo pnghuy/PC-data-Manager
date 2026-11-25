@@ -4,7 +4,7 @@
  * 1. Kết quả benchmark lấy từ kho.json của repo tinhte-charts, theo id bài test (TESTS bên dưới).
  *    Bài test riêng (game, AI…) khai báo trong mục "tests" của kho.json.
  *    Bài test được xếp vào nhóm dựa theo tiêu đề (CATEGORIES). Đơn vị "FPS" tự vào nhóm game.
- * 2. Màn hình / pin: chưa có nguồn, sẽ bổ sung ở bước sau.
+ * 2. Cấu hình / màn hình / pin / ngày test / link bài: từ laptops.json của repo tinhte-charts.
  */
 window.LAB = window.LAB || {};
 
@@ -27,6 +27,7 @@ LAB.SPECS = [
   { key: 'storage', label: 'Ổ cứng', type: 'text' },
   { key: 'weight_kg', label: 'Khối lượng', unit: 'kg', decimals: 2, noRank: true },
   { key: 'os', label: 'Hệ điều hành', type: 'text' },
+  { key: 'price', label: 'Giá tham khảo', type: 'text' },
 ];
 
 /*
@@ -78,6 +79,7 @@ LAB.STATIC_SECTIONS = [
           { key: 'battery_office', label: 'Làm việc văn phòng', type: 'duration' },
           { key: 'battery_video', label: 'Xem video', type: 'duration' },
           { key: 'battery_gaming', label: 'Chơi game', type: 'duration' },
+          { key: 'battery_charge_time', label: 'Sạc 0 → 100%', type: 'duration', lowerBetter: true },
         ],
       },
     ],

@@ -15,6 +15,8 @@ LAB.CONFIG = {
     branch: 'main',
     // Kho máy dùng chung với Tinhte Chart Studio. Thêm/sửa máy ở Chart Studio là web tự cập nhật.
     khoFile: 'kho.json',
+    // Thông tin thêm cho từng máy (ngày test, link bài, màn hình, pin…), khoá là id máy trong kho.json.
+    metaFile: 'laptops.json',
   },
 
   // Bao lâu (phút) thì tải lại kho.json. File đọc qua raw.githubusercontent.com nên không bị

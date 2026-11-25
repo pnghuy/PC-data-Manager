@@ -21,13 +21,18 @@ async function run() {
     const kho = await res.json();
     if (!kho || typeof kho.devices !== 'object') throw new Error('kho.json không có mục "devices"');
 
+    // laptops.json (ngày test, link bài, màn hình, pin…) là tuỳ chọn
+    const metaRes = await fetch(`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/laptops.json`);
+    const meta = metaRes.ok ? await metaRes.json() : {};
+
     const targetPath = path.join(rootDir, 'data', 'kho-snapshot.js');
     const fileContent =
       `/* Bản dự phòng kho.json của ${OWNER}/${REPO}, dùng khi không tải được từ GitHub. Tạo bằng: npm run sync-data */\n` +
       `window.LAB = window.LAB || {};\n` +
-      `LAB.KHO_SNAPSHOT = ${JSON.stringify(kho, null, 1)};\n`;
+      `LAB.KHO_SNAPSHOT = ${JSON.stringify(kho, null, 1)};\n` +
+      `LAB.META_SNAPSHOT = ${JSON.stringify(meta, null, 1)};\n`;
     fs.writeFileSync(targetPath, fileContent, 'utf-8');
-    console.log(`✅ ${Object.keys(kho.devices).length} máy → ${path.relative(rootDir, targetPath)}`);
+    console.log(`✅ ${Object.keys(kho.devices).length} máy, ${Object.keys(meta).length} mục thông tin → ${path.relative(rootDir, targetPath)}`);
   } catch (err) {
     console.error(`❌ Đồng bộ thất bại: ${err.message}`);
     process.exit(1);
