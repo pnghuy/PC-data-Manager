@@ -19,7 +19,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme='dark']) {
     --bg: #f3f5f9;
     --bg-2: #ffffff;
     --bg-3: #eef2f8;
@@ -37,6 +37,25 @@
     --shadow: 0 1px 2px rgba(20, 30, 60, 0.06), 0 6px 18px rgba(20, 30, 60, 0.05);
     color-scheme: light;
   }
+}
+
+:root[data-theme='light'] {
+  --bg: #f3f5f9;
+  --bg-2: #ffffff;
+  --bg-3: #eef2f8;
+  --line: #dde3ee;
+  --text: #141a26;
+  --muted: #64708a;
+  --accent: #0088cc;
+  --accent-2: #0077b3;
+  --series-1: #0088cc;
+  --series-2: #5aaf33;
+  --series-3: #e0901a;
+  --bar-bg: #e3e9f3;
+  --good: #12a36c;
+  --bad: #e2552f;
+  --shadow: 0 1px 2px rgba(20, 30, 60, 0.06), 0 6px 18px rgba(20, 30, 60, 0.05);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -71,9 +90,25 @@ main.container { flex: 1; padding-top: 24px; padding-bottom: 48px; }
   background: var(--accent); color: #fff;
 }
 .brand-text b { color: var(--accent-2); }
-.topnav { display: flex; gap: 20px; font-size: 14px; }
+.topnav { display: flex; align-items: center; gap: 20px; font-size: 14px; }
 .topnav a { color: var(--muted); }
 .topnav a:hover { color: var(--text); }
+.theme-toggle {
+  display: inline-grid; place-items: center;
+  width: 36px; height: 36px; padding: 0;
+  border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg-2); color: var(--muted); cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--accent); background: var(--bg-3); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-toggle .icon-moon { display: none; }
+:root[data-theme='light'] .theme-toggle .icon-sun { display: none; }
+:root[data-theme='light'] .theme-toggle .icon-moon { display: block; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .theme-toggle .icon-sun { display: none; }
+  :root:not([data-theme='dark']) .theme-toggle .icon-moon { display: block; }
+}
 
 /* ---------- Common ---------- */
 .notice {

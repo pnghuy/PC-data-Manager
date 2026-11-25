@@ -923,7 +923,47 @@
     }
   }
 
+  /* ---------- Chuyển giao diện Sáng / Tối ---------- */
+
+  function initThemeToggle() {
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    const KEY = 'tinhte-lab-theme';
+    const root = document.documentElement;
+    const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+
+    const currentTheme = () => {
+      if (root.dataset.theme === 'light' || root.dataset.theme === 'dark') return root.dataset.theme;
+      return media && media.matches ? 'light' : 'dark';
+    };
+
+    const syncLabel = () => {
+      const isLight = currentTheme() === 'light';
+      const label = isLight ? 'Chuyển sang giao diện tối' : 'Chuyển sang giao diện sáng';
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('title', label);
+    };
+
+    btn.addEventListener('click', () => {
+      const next = currentTheme() === 'light' ? 'dark' : 'light';
+      root.dataset.theme = next;
+      try {
+        localStorage.setItem(KEY, next);
+      } catch (e) {
+        // Bỏ qua khi trình duyệt chặn localStorage
+      }
+      syncLabel();
+    });
+
+    if (media && media.addEventListener) {
+      media.addEventListener('change', syncLabel);
+    }
+    syncLabel();
+  }
+
   /* ---------- Khởi động ứng dụng ---------- */
+
+  initThemeToggle();
 
   LAB.loadData()
     .then((db) => {

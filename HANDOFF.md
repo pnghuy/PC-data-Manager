@@ -12,20 +12,23 @@ Luật chung của repo xem ở `AGENTS.md`.
   - App đọc `kho.json` và `laptops.json` của tinhte-charts, hiện 32 máy
   - Giao diện public theo màu Tinh tế, biểu đồ dạng hàng, có số tham khảo
   - So sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
-- **PR đang mở:** `setup-deploy` (gọn `dist/` + kiểm tra đủ file bắt buộc + `.nojekyll`, thêm workflow GitHub Pages `.github/workflows/deploy-pages.yml`, cập nhật hướng dẫn deploy Cloudflare Pages / GitHub Pages trong `README.md`)
+  - Đã deploy thử nghiệm trên GitHub Pages (`https://pnghuy.github.io/PC-data-Manager/`) qua workflow `.github/workflows/deploy-pages.yml`
+- **PR đang mở:** `theme-toggle` (thêm nút chuyển giao diện Sáng/Tối trên topbar, lưu lựa chọn vào `localStorage`)
 - **Chưa làm:**
-  - Kích hoạt deploy public (kết nối Cloudflare Pages hoặc bật GitHub Pages) và gắn tên miền
-  - Ảnh máy và link bài review trong `laptops.json`: hầu hết máy chưa có, cần anh cung cấp
+  - Thiết kế / thay logo cho trang và favicon
+  - Ảnh thực tế máy và link bài review trong `laptops.json` (hầu hết máy chưa có, cần anh cung cấp)
+  - Gắn tên miền riêng sau khi hoàn thiện giao diện, logo và ảnh máy
 
 ## Việc tiếp theo (theo thứ tự)
 
-1. **Kích hoạt deploy và gắn tên miền (cần anh thao tác sau khi merge PR `setup-deploy`)**
-   - Chọn Cloudflare Pages (Build command `npm run build`, output `dist`) hoặc GitHub Pages (**Settings → Pages → Source: GitHub Actions**), xem hướng dẫn chi tiết ở mục 5 `README.md`.
-   - Chọn và gắn tên miền riêng (ví dụ `laptop.tinhte.vn` hoặc `lab.tinhte.vn`).
+1. **Logo cho trang**
+   - Thay icon laptop mặc định ở góc trái topbar và favicon bằng logo riêng của Tinh tế Laptop Lab.
 2. **Bổ sung `laptops.json` ở tinhte-charts**
-   - Điền `review_url`, `image_url`, màn hình, pin cho các máy đã có bài review.
+   - Điền `image_url` (ảnh thực tế của máy), `review_url`, màn hình, pin cho các máy đã có bài review.
    - Chỉ điền số có thật.
-3. **(Chờ dữ liệu) Geekbench cắm sạc và chạy pin**
+3. **Gắn tên miền riêng & public chính thức**
+   - Sau khi giao diện, logo và ảnh máy đã chỉn chu, gắn tên miền riêng (Cloudflare Pages hoặc GitHub Pages, xem mục 5 `README.md`).
+4. **(Chờ dữ liệu) Geekbench cắm sạc và chạy pin**
    - Chỉ làm khi `kho.json` có điểm đo lúc chạy pin, ví dụ thêm id bài test `geekbench-7-battery` ở Chart Studio.
 
 ## Việc đang làm dở
@@ -87,4 +90,5 @@ Muốn làm việc khác thì thay nửa sau của câu bằng việc cụ thể
 | 2026-11-25 | Claude | PR #3: giao diện public |
 | 2026-11-25 | Claude | PR #4: so sánh nhiều máy, tab bài cùng họ, tải PNG |
 | 2026-11-25 | Claude | PR bàn giao: AGENTS.md, HANDOFF.md |
-| 2026-11-25 | Antigravity | Chuẩn bị deploy: kiểm tra `dist/`, thêm workflow GitHub Pages, cập nhật hướng dẫn Cloudflare/GitHub Pages |
+| 2026-11-25 | Antigravity | PR #7: chuẩn bị deploy (`dist/`, workflow GitHub Pages, hướng dẫn Cloudflare/GitHub Pages) |
+| 2026-11-25 | Antigravity | Thêm nút chuyển giao diện Sáng/Tối trên topbar (lưu `localStorage`) |
