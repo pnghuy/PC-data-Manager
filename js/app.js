@@ -17,7 +17,22 @@
     category: 'all',
     shown: LAB.CONFIG.pageSize || 24,
     showIssues: false,
+    compare: [], // id các máy đang chọn để so sánh (tối đa CMP_MAX)
   };
+  const CMP_MAX = 4;
+
+  // Bài test cùng họ gộp thành một khung có tab (vd Cinebench 2026 / 2024 / R23)
+  const FAMILIES = [
+    { id: 'cinebench', label: 'Cinebench', tests: ['cinebench-2026', 'cinebench-2024', 'cinebench-r23'] },
+    { id: 'geekbench', label: 'Geekbench', tests: ['geekbench-7', 'geekbench-6'] },
+    { id: 'time-spy', label: '3DMark Time Spy', tests: ['3dmark-time-spy', '3dmark-time-spy-extreme'] },
+    { id: 'fire-strike', label: '3DMark Fire Strike', tests: ['3dmark-fire-strike', '3dmark-fire-strike-extreme', '3dmark-fire-strike-ultra'] },
+    { id: 'steel-nomad', label: '3DMark Steel Nomad', tests: ['3dmark-steel-nomad', '3dmark-steel-nomad-light'] },
+  ];
+  const familyOf = (tid) => FAMILIES.find((f) => f.tests.indexOf(tid) >= 0);
+
+  // Biểu đồ đang hiện trên trang, để nút "Tải ảnh" lấy lại dữ liệu
+  let RENDERED = [];
 
   // Màu theo nhận diện Tinh tế (xanh dương, xanh lá) như chart trong bài viết
   const SERIES_COLORS = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)'];
@@ -51,6 +66,14 @@
     const { parts, params } = parseHash();
     if (parts[0] === 'may' && parts[1]) {
       renderDetail(decodeURIComponent(parts[1]));
+      renderTray();
+      return;
+    }
+    if (parts[0] === 'so-sanh') {
+      const ids = (params.get('m') || '').split(',').map((x) => decodeURIComponent(x)).filter((id) => DB.byId[id]);
+      if (ids.length) state.compare = ids.slice(0, CMP_MAX);
+      renderCompare();
+      renderTray();
       return;
     }
     state.q = params.get('q') || '';
@@ -58,6 +81,7 @@
     state.category = params.get('cat') || 'all';
     state.shown = LAB.CONFIG.pageSize || 24;
     renderHome();
+    renderTray();
   }
 
   /* ---------- Lọc & Sắp xếp ---------- */
@@ -139,6 +163,7 @@
     });
 
     return (
+      '<div class="card-cell">' +
       '<a class="card" href="#/may/' + encodeURIComponent(l.id) + '">' +
       thumb(l, 'card-thumb') +
       '<div class="card-body">' +
@@ -151,7 +176,9 @@
       (benchPills.length ? '<div class="card-benchs">' + benchPills.join('') + '</div>' : '') +
       '</div>' +
       metricBox +
-      '</a>'
+      '</a>' +
+      '<div class="card-foot">' + cmpButton(l.id, 'cmp-toggle') + '</div>' +
+      '</div>'
     );
   }
 
@@ -320,6 +347,7 @@
     }
 
     grid.innerHTML = list.slice(0, state.shown).map((l) => card(l, metricKey)).join('');
+    grid.querySelectorAll('.cmp-toggle').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
     if (list.length > state.shown) {
       more.innerHTML = '<button class="btn" id="moreBtn">Xem thêm (' + (list.length - state.shown) + ' máy)</button>';
       document.getElementById('moreBtn').onclick = () => {
@@ -333,7 +361,9 @@
 
   /* ---------- Render Biểu đồ Benchmark chi tiết ---------- */
 
-  function renderChartCard(ch, l) {
+  function renderChartCard(ch, opts) {
+    opts = opts || {};
+    const ci = RENDERED.push(ch) - 1;
     const isMultiSeries = ch.series && ch.series.length > 1;
 
     // Tìm giá trị max để tính % thanh dài nhất
@@ -360,10 +390,11 @@
       rankBadge = '<span class="chart-badge" style="color:var(--good);border-color:color-mix(in srgb, var(--good) 40%, var(--line));">Hạng #' + ch.rank.rank + ' / ' + ch.rank.total + ' máy Tinh tế đo</span>';
     }
     if (ch.ref) rankBadge = '<span class="chart-badge">Số tham khảo</span>';
+    if (opts.compare) rankBadge = '';
 
     // Chỉ hiện các máy quanh máy đang xem, phần còn lại ẩn sau nút "Xem tất cả"
     const hlIdx = ch.items.findIndex((i) => i.highlight);
-    const WINDOW = 3;
+    const WINDOW = opts.compare ? 99 : 3;
     let lo = Math.max(0, hlIdx - WINDOW);
     let hi = Math.min(ch.items.length, lo + WINDOW * 2 + 1);
     lo = Math.max(0, hi - (WINDOW * 2 + 1));
@@ -397,16 +428,18 @@
           })
           .join('');
 
-        const nameHtml = it.id && !isHl ? '<a href="#/may/' + encodeURIComponent(it.id) + '">' + esc(it.name) + '</a>' : esc(it.name);
+        const nameHtml = it.id && (!isHl || opts.compare) ? '<a href="#/may/' + encodeURIComponent(it.id) + '">' + esc(it.name) + '</a>' : esc(it.name);
         const extra = idx < lo || idx >= hi;
         return (
-          '<div class="chart-item' + (isHl ? ' chart-item-hl' : '') + (extra ? ' chart-item-extra' : '') + '"' + (extra ? ' hidden' : '') + '>' +
+          '<div class="chart-item' + (isHl ? ' chart-item-hl' : '') + (extra ? ' chart-item-extra' : '') + '" data-ii="' + idx + '"' + (extra ? ' hidden' : '') + '>' +
           '<div class="chart-item-head">' +
           '<span class="chart-item-name">' +
           nameHtml +
-          (isHl ? ' <span class="hl-tag">Máy đang xem</span>' : '') +
-          (it.ref && !isHl ? ' <span class="ref-tag">tham khảo</span>' : '') +
+          (isHl ? ' <span class="hl-tag">' + (opts.compare ? 'Tốt nhất' : 'Máy đang xem') + '</span>' : '') +
+          (it.ref && (!isHl || opts.compare) ? ' <span class="ref-tag">tham khảo</span>' : '') +
+          (it.diff ? ' <span class="diff-tag">' + esc(it.diff) + '</span>' : '') +
           '</span>' +
+          (it.sub ? '<span class="chart-item-sub">' + esc(it.sub) + '</span>' : '') +
           '</div>' +
           '<div class="chart-series-list">' + seriesRows + '</div>' +
           '</div>'
@@ -415,7 +448,7 @@
       .join('');
 
     return (
-      '<div class="chart-card">' +
+      '<div class="chart-card" data-ci="' + ci + '"' + (opts.hidden ? ' hidden' : '') + '>' +
       '<div class="chart-head">' +
       '<div class="chart-title-wrap">' +
       '<h3 class="chart-title">' +
@@ -425,17 +458,286 @@
       '</h3>' +
       (ch.subtitle ? '<div class="chart-sub">' + esc(ch.subtitle) + '</div>' : '') +
       '</div>' +
+      '<button type="button" class="chart-dl" title="Tải biểu đồ này về dạng ảnh PNG">' +
+      '<svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M3 15v2h14v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '<span>Tải ảnh</span></button>' +
       '</div>' +
       legend +
       '<div class="chart-list">' + itemsHtml + '</div>' +
       (hiddenCount > 0 ? '<button type="button" class="btn chart-more">Xem tất cả ' + ch.items.length + ' máy</button>' : '') +
+      (opts.missing && opts.missing.length ? '<div class="chart-missing">Chưa có số: ' + opts.missing.map(esc).join(', ') + '</div>' : '') +
       '</div>'
     );
+  }
+
+  /* Gộp các bài cùng họ (Cinebench, Geekbench, 3DMark…) thành một khung có tab */
+  function renderChartBlocks(charts, opts) {
+    const done = {};
+    const out = [];
+    charts.forEach((ch) => {
+      if (done[ch.testKey]) return;
+      const fam = familyOf(ch.testKey);
+      const members = fam
+        ? charts.filter((c) => fam.tests.indexOf(c.testKey) >= 0).sort((a, b) => fam.tests.indexOf(a.testKey) - fam.tests.indexOf(b.testKey))
+        : [ch];
+      // Một máy có cả bài đo và bài tham khảo cùng tên thì vẫn tách riêng
+      if (members.length < 2 || new Set(members.map((c) => c.testKey)).size !== members.length) {
+        out.push(renderChartCard(ch, Object.assign({}, opts, { missing: opts && opts.missingOf ? opts.missingOf(ch) : opts && opts.missing })));
+        return;
+      }
+      members.forEach((c) => { done[c.testKey] = true; });
+      const tabs = members
+        .map((c, i) => '<button type="button" role="tab" aria-selected="' + (i === 0) + '" data-tab="' + i + '">' + esc(c.title.replace(fam.label, '').trim() || c.title) + '</button>')
+        .join('');
+      out.push(
+        '<div class="chart-group">' +
+        '<div class="chart-tabs" role="tablist" aria-label="' + esc(fam.label) + '"><span class="chart-tabs-label">' + esc(fam.label) + '</span>' + tabs + '</div>' +
+        members.map((c, i) => renderChartCard(c, Object.assign({}, opts, { hidden: i > 0, missing: opts && opts.missingOf ? opts.missingOf(c) : null }))).join('') +
+        '</div>'
+      );
+    });
+    return out.join('');
+  }
+
+  /* ---------- Chọn máy để so sánh ---------- */
+
+  // Tên kèm cấu hình khi có nhiều máy trùng tên (vd ba bản Acer Nitro ProPanel)
+  function dispName(l) {
+    return l.variant ? l.name + ' (' + l.variant + ')' : l.name;
+  }
+
+  function cmpButton(id, cls) {
+    const on = state.compare.indexOf(id) >= 0;
+    return '<button type="button" class="' + cls + (on ? ' on' : '') + '" data-cmp="' + esc(id) + '" aria-pressed="' + on + '">' + (on ? '✓ Đã chọn so sánh' : '+ So sánh') + '</button>';
+  }
+
+  function toggleCompare(id) {
+    const i = state.compare.indexOf(id);
+    if (i >= 0) state.compare.splice(i, 1);
+    else if (state.compare.length >= CMP_MAX) {
+      flashTray('Chỉ so sánh tối đa ' + CMP_MAX + ' máy một lúc. Bỏ bớt một máy trước nhé.');
+      return;
+    } else state.compare.push(id);
+    document.querySelectorAll('[data-cmp="' + CSS.escape(id) + '"]').forEach((b) => {
+      const on = state.compare.indexOf(id) >= 0;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on);
+      b.textContent = on ? '✓ Đã chọn so sánh' : '+ So sánh';
+    });
+    renderTray();
+  }
+
+  function compareHash(ids) {
+    return '#/so-sanh?m=' + ids.map(encodeURIComponent).join(',');
+  }
+
+  let trayMsgTimer;
+  function flashTray(msg) {
+    renderTray(true);
+    const m = document.querySelector('#cmpTray .tray-msg');
+    if (!m) return;
+    m.textContent = msg;
+    clearTimeout(trayMsgTimer);
+    trayMsgTimer = setTimeout(() => { m.textContent = ''; }, 3500);
+  }
+
+  function renderTray(force) {
+    let tray = document.getElementById('cmpTray');
+    if (!tray) {
+      tray = document.createElement('div');
+      tray.id = 'cmpTray';
+      tray.className = 'cmp-tray';
+      document.body.appendChild(tray);
+    }
+    const onCompare = parseHash().parts[0] === 'so-sanh';
+    const n = state.compare.length;
+    const show = (n > 0 || force) && !onCompare;
+    tray.hidden = !show;
+    document.body.classList.toggle('has-tray', show);
+    const nav = document.getElementById('navCompare');
+    if (nav) nav.textContent = n ? 'So sánh (' + n + ')' : 'So sánh';
+    if (!show) return;
+    const chips = state.compare
+      .map((id) => {
+        const l = DB.byId[id];
+        return '<span class="tray-chip"><span>' + esc(l ? dispName(l) : id) + '</span><button type="button" data-cmp="' + esc(id) + '" aria-label="Bỏ máy này">×</button></span>';
+      })
+      .join('');
+    tray.innerHTML =
+      '<div class="container tray-inner">' +
+      '<div class="tray-chips">' + (chips || '<span class="muted">Chưa chọn máy nào</span>') + '<span class="tray-msg" role="status"></span></div>' +
+      '<div class="tray-actions">' +
+      (n ? '<button type="button" class="btn tray-clear">Bỏ chọn</button>' : '') +
+      (n >= 2
+        ? '<a class="btn btn-primary" href="' + compareHash(state.compare) + '">So sánh ' + n + ' máy →</a>'
+        : '<span class="tray-hint">Chọn thêm ít nhất 1 máy</span>') +
+      '</div>' +
+      '</div>';
+    tray.querySelectorAll('[data-cmp]').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
+    const clr = tray.querySelector('.tray-clear');
+    if (clr) clr.onclick = () => {
+      const ids = state.compare.slice();
+      state.compare = [];
+      ids.forEach((id) => document.querySelectorAll('[data-cmp="' + CSS.escape(id) + '"]').forEach((b) => {
+        b.classList.remove('on'); b.setAttribute('aria-pressed', false); b.textContent = '+ So sánh';
+      }));
+      renderTray();
+    };
+  }
+
+  /* ---------- Trang so sánh nhiều máy ---------- */
+
+  function renderCompare() {
+    RENDERED = [];
+    const list = state.compare.map((id) => DB.byId[id]).filter(Boolean);
+    document.title = 'So sánh laptop – ' + LAB.CONFIG.siteName;
+    if (list.length < 2) {
+      app.innerHTML =
+        '<a class="back" href="' + homeHash() + '">← Tất cả máy</a>' +
+        '<div class="empty"><b>Chọn ít nhất 2 máy để so sánh.</b><br>Ở danh sách máy, bấm “+ So sánh” dưới mỗi máy (tối đa ' + CMP_MAX + ' máy), rồi bấm “So sánh” ở thanh dưới màn hình.' +
+        (list.length ? '<br><br>Đang chọn: <b>' + esc(dispName(list[0])) + '</b>' : '') +
+        '<br><br><a class="btn btn-primary" href="' + homeHash() + '">Chọn máy</a></div>';
+      window.scrollTo(0, 0);
+      return;
+    }
+    document.title = list.map((l) => l.name).join(' vs ') + ' – ' + LAB.CONFIG.siteName;
+
+    // Đầu trang: mỗi máy một cột
+    const heads = list
+      .map(
+        (l) =>
+          '<div class="cmp-head">' +
+          thumb(l, 'card-thumb') +
+          '<a class="cmp-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(l.name) + '</a>' +
+          '<div class="cmp-chip">' + esc([l.raw.cpu, l.raw.gpu].filter(Boolean).join(' · ')) + '</div>' +
+          (l.measured ? '' : '<span class="tag tag-muted">Số tham khảo</span>') +
+          '<button type="button" class="cmp-remove" data-remove="' + esc(l.id) + '">Bỏ khỏi so sánh</button>' +
+          '</div>'
+      )
+      .join('');
+
+    // Bảng thông số: chỉ các dòng có ít nhất một máy có số
+    const metrics = LAB.SPECS.map((m) => ({ m, group: 'Cấu hình' })).concat(
+      ...LAB.STATIC_SECTIONS.map((sec) => [].concat(...sec.groups.map((g) => g.metrics.map((m) => ({ m, group: sec.title })))))
+    );
+    let lastGroup = '';
+    const cols = list.length;
+    const rows = metrics
+      .map(({ m, group }) => {
+        const vals = list.map((l) => l.raw[m.key]);
+        if (!vals.some(Boolean)) return '';
+        // Đánh dấu máy tốt nhất cho các dòng có số và có xếp hạng
+        let best = null;
+        if (!m.noRank && m.type !== 'text') {
+          const nums = list.map((l) => l.v[m.key]).filter((x) => x != null);
+          if (nums.length >= 2) best = m.lowerBetter ? Math.min(...nums) : Math.max(...nums);
+        }
+        const groupRow = group !== lastGroup ? '<tr class="cmp-group"><th colspan="' + (cols + 1) + '">' + esc(group) + '</th></tr>' : '';
+        lastGroup = group;
+        return (
+          groupRow +
+          '<tr><th scope="row">' + esc(m.label) + '</th>' +
+          list
+            .map((l, i) => {
+              const v = vals[i];
+              const isBest = best != null && l.v[m.key] === best;
+              return '<td' + (isBest ? ' class="best"' : '') + '>' + (v ? esc(v) + (m.unit ? ' <small>' + esc(m.unit) + '</small>' : '') : '<span class="muted">—</span>') + '</td>';
+            })
+            .join('') +
+          '</tr>'
+        );
+      })
+      .join('');
+
+    // Biểu đồ: mỗi bài test mà ít nhất một máy có số
+    const byTest = {};
+    list.forEach((l) => {
+      l.charts.forEach((ch) => {
+        if (byTest[ch.testKey] && !byTest[ch.testKey].ref) return;
+        byTest[ch.testKey] = byTest[ch.testKey] || ch;
+      });
+    });
+    const missingMap = {};
+    const charts = Object.keys(byTest).map((tid) => {
+      const base = byTest[tid];
+      const mainIdx = base.series.length - 1;
+      const items = [];
+      const missing = [];
+      list.forEach((l) => {
+        const own = l.charts.find((c) => c.testKey === tid && !c.ref) || l.charts.find((c) => c.testKey === tid);
+        if (!own) { missing.push(dispName(l)); return; }
+        const hl = own.items.find((i) => i.highlight);
+        const sub = base.category === 'gpu' || base.category === 'games' ? l.raw.gpu : base.category === 'cpu' ? l.raw.cpu : '';
+        items.push({ name: l.name, sub, values: hl.values, highlight: false, ref: own.ref, id: l.id });
+      });
+      items.sort((a, b) => (base.lowerBetter ? a.values[mainIdx] - b.values[mainIdx] : b.values[mainIdx] - a.values[mainIdx]));
+      // Máy tốt nhất (chỉ xét máy Tinh tế đo) và chênh lệch % của các máy còn lại
+      const measured = items.filter((it) => !it.ref && it.values[mainIdx] != null);
+      if (items.length >= 2 && measured.length) {
+        const best = measured[0];
+        best.highlight = true;
+        const bv = best.values[mainIdx];
+        items.forEach((it) => {
+          const v = it.values[mainIdx];
+          if (it === best || v == null || !bv) return;
+          const pct = base.lowerBetter ? (bv / v - 1) * 100 : (v / bv - 1) * 100;
+          it.diff = (pct > 0 ? '+' : '−') + Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0) + '%';
+        });
+      }
+      missingMap[tid] = missing;
+      return {
+        testKey: tid, title: base.title, subtitle: base.subtitle, unit: base.unit, lowerBetter: base.lowerBetter,
+        category: base.category, series: base.series, items, rank: null, ref: false, decimals: null,
+      };
+    });
+
+    const sections = [];
+    const toc = ['<button type="button" data-target="sec-specs">Thông số</button>'];
+    const catTitles = { cpu: 'Hiệu năng CPU', gpu: 'Hiệu năng đồ hoạ', games: 'Chơi game thực tế', ai: 'AI chạy cục bộ', system: 'Hiệu năng tổng thể & pin', other: 'Bài test khác' };
+    LAB.SECTION_ORDER.forEach((cat) => {
+      const cs = charts
+        .filter((c) => (catTitles[c.category] ? c.category : 'other') === cat)
+        .sort((a, b) => b.items.length - a.items.length || a.title.localeCompare(b.title, 'vi'));
+      if (!cs.length) return;
+      toc.push('<button type="button" data-target="sec-' + cat + '">' + esc(catTitles[cat]) + ' (' + cs.length + ')</button>');
+      sections.push(
+        '<section class="panel" id="sec-' + cat + '"><h2>' + esc(catTitles[cat]) + '</h2>' +
+        cs.map((c) => (familyOf(c.testKey) ? '' : renderChartCard(c, { compare: true, missing: missingMap[c.testKey] }))).join('') +
+        renderChartBlocks(cs.filter((c) => familyOf(c.testKey)), { compare: true, missingOf: (c) => missingMap[c.testKey] }) +
+        '</section>'
+      );
+    });
+
+    app.innerHTML =
+      '<a class="back" href="' + homeHash() + '">← Tất cả máy</a>' +
+      '<section class="cmp-top"><h1>So sánh ' + list.length + ' máy</h1>' +
+      '<div class="actions"><button class="btn" type="button" id="copyLink">🔗 Sao chép link so sánh</button>' +
+      (list.length < CMP_MAX ? '<a class="btn" href="' + homeHash() + '">+ Thêm máy</a>' : '') +
+      '</div></section>' +
+      '<div class="cmp-heads" style="--cols:' + cols + '">' + heads + '</div>' +
+      '<nav class="toc">' + toc.join('') + '</nav>' +
+      '<section class="panel" id="sec-specs"><h2>Thông số</h2><div class="cmp-table-wrap"><table class="cmp-table" style="--cols:' + cols + '">' +
+      '<thead><tr><th></th>' + list.map((l) => '<th scope="col">' + esc(dispName(l)) + '</th>').join('') + '</tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></section>' +
+      sections.join('') +
+      '<p class="legend muted">Dòng “Tốt nhất” là máy Tinh tế đo có kết quả cao nhất trong nhóm đang so sánh; con số % là chênh lệch so với máy đó. Số “tham khảo” lấy từ nguồn ngoài, không dùng để chọn máy tốt nhất.</p>';
+
+    app.querySelectorAll('[data-remove]').forEach((b) => {
+      b.onclick = () => {
+        state.compare = state.compare.filter((id) => id !== b.dataset.remove);
+        history.replaceState(null, '', compareHash(state.compare));
+        renderCompare();
+        renderTray();
+      };
+    });
+    bindDetailCommon();
+    window.scrollTo(0, 0);
   }
 
   /* ---------- Render Trang Chi Tiết ---------- */
 
   function renderDetail(id) {
+    RENDERED = [];
     const l = DB.byId[id];
     if (!l) {
       document.title = 'Không tìm thấy máy – ' + LAB.CONFIG.siteName;
@@ -491,7 +793,7 @@
       if (!group || !group.charts.length) return;
       const secId = 'sec-' + catId;
       tocButtons.push('<button type="button" data-target="' + secId + '">' + esc(group.title) + ' (' + group.charts.length + ')</button>');
-      const chartsHtml = group.charts.map((ch) => renderChartCard(ch, l)).join('');
+      const chartsHtml = renderChartBlocks(group.charts);
       sectionHtmls.push(
         '<section class="panel" id="' + secId + '">' +
         '<h2>' + esc(group.title) + '</h2>' +
@@ -541,6 +843,7 @@
       (info.length ? '<div class="detail-info">' + info.join('<span class="dot">•</span>') + '</div>' : '') +
       '<div class="actions">' +
       (l.review ? '<a class="btn" href="' + esc(l.review) + '" target="_blank" rel="noopener">📝 Bài review Tinh tế ↗</a>' : '') +
+      cmpButton(l.id, 'btn cmp-btn') +
       '<button class="btn" type="button" id="copyLink">🔗 Sao chép link máy này</button>' +
       '</div>' +
       '</div>' +
@@ -552,10 +855,44 @@
       (l.notes ? '<section class="panel"><h2>Ghi chú đánh giá</h2><p class="notes">' + esc(l.notes).replace(/\n/g, '<br>') + '</p></section>' : '') +
       '<p class="legend muted">Mỗi biểu đồ so sánh máy đang xem với các máy cùng loại có cùng bài test. Dòng ghi “tham khảo” là số liệu lấy từ nguồn ngoài, không do Tinh tế tự đo, và không tính vào thứ hạng.</p>';
 
+    app.querySelectorAll('.cmp-btn').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
+    bindDetailCommon();
+    window.scrollTo(0, 0);
+  }
+
+  /* Sự kiện dùng chung cho trang máy và trang so sánh */
+  function bindDetailCommon() {
     app.querySelectorAll('.chart-more').forEach((b) => {
       b.onclick = () => {
         b.parentElement.querySelectorAll('.chart-item-extra').forEach((el) => { el.hidden = false; });
         b.remove();
+      };
+    });
+
+    // Tab trong khung bài cùng họ
+    app.querySelectorAll('.chart-group').forEach((g) => {
+      const tabs = g.querySelectorAll('.chart-tabs [data-tab]');
+      const cards = g.querySelectorAll(':scope > .chart-card');
+      tabs.forEach((t) => {
+        t.onclick = () => {
+          tabs.forEach((x) => x.setAttribute('aria-selected', x === t));
+          cards.forEach((c, i) => { c.hidden = String(i) !== t.dataset.tab; });
+        };
+      });
+    });
+
+    // Tải ảnh PNG của biểu đồ: lấy đúng các dòng đang hiện
+    app.querySelectorAll('.chart-dl').forEach((b) => {
+      b.onclick = () => {
+        const cardEl = b.closest('.chart-card');
+        const ch = RENDERED[+cardEl.dataset.ci];
+        const visible = Array.from(cardEl.querySelectorAll('.chart-item:not([hidden])')).map((el) => ch.items[+el.dataset.ii]);
+        const label = b.querySelector('span');
+        label.textContent = 'Đang tạo…';
+        const footer = DB.index.commitDate ? 'Dữ liệu cập nhật ' + U.fmtDate(U.parseDate(DB.index.commitDate)) : '';
+        LAB.exportChartPNG(ch, visible, { footer, filename: 'tinhte-' + U.slugify(ch.title) })
+          .catch((e) => { console.error(e); alert('Không tạo được ảnh: ' + e.message); })
+          .finally(() => { label.textContent = 'Tải ảnh'; });
       };
     });
 
@@ -567,14 +904,15 @@
       };
     });
 
-    // Nút copy link máy
+    // Nút copy link
     const copyBtn = document.getElementById('copyLink');
     if (copyBtn) {
+      const idle = copyBtn.textContent;
       copyBtn.onclick = () => {
         const url = location.href;
         const done = () => {
           copyBtn.textContent = 'Đã sao chép link ✓';
-          setTimeout(() => (copyBtn.textContent = '🔗 Sao chép link máy này'), 1800);
+          setTimeout(() => (copyBtn.textContent = idle), 1800);
         };
         if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(url).then(done, () => window.prompt('Sao chép link:', url));
@@ -583,8 +921,6 @@
         }
       };
     }
-
-    window.scrollTo(0, 0);
   }
 
   /* ---------- Khởi động ứng dụng ---------- */

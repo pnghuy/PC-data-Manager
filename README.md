@@ -86,7 +86,10 @@ Ngày test, link bài review, ảnh, RAM, màn hình, pin… không nằm trong 
    - Máy đang xem được highlight phát sáng với huy hiệu `[MÁY ĐANG XEM]`.
    - Thứ hạng trong số các máy Tinh tế tự đo: `Hạng #2 / 16 máy Tinh tế đo`.
    - Mặc định hiện 7 máy quanh máy đang xem, bấm "Xem tất cả" để mở hết.
-5. **Kiểm tra dữ liệu**: điểm sai số cột hoặc bài test chưa khai báo trong kho được liệt kê ở nút "lưu ý dữ liệu" trên thanh nguồn.
+5. **So sánh nhiều máy** (`#/so-sanh?m=id1,id2`): bấm "+ So sánh" dưới thẻ máy hoặc trên trang máy, chọn 2–4 máy rồi bấm "So sánh" ở thanh dưới màn hình. Trang so sánh có bảng thông số (đánh dấu máy tốt nhất) và biểu đồ từng bài test, kèm % chênh lệch với máy tốt nhất. Link so sánh chia sẻ được.
+6. **Tab cho bài cùng họ**: Cinebench 2026/2024/R23, Geekbench 7/6, 3DMark Time Spy, Fire Strike, Steel Nomad gộp chung một khung có tab khi máy có từ 2 phiên bản trở lên.
+7. **Tải ảnh PNG**: nút "Tải ảnh" trên mỗi biểu đồ xuất ảnh nền trắng màu Tinh tế, đúng các dòng đang hiện (bấm "Xem tất cả" trước nếu muốn đủ máy).
+8. **Kiểm tra dữ liệu**: mở `#/?debug=1` để xem nguồn đang dùng, nút tải lại và các "lưu ý dữ liệu" (sai số cột, bài test chưa khai báo).
 
 ---
 
@@ -125,7 +128,8 @@ tinhte-laptop-lab/
 │   ├── config.js               # Cấu hình repo GitHub (owner, repo, branch, file kho)
 │   ├── schema.js               # Danh mục bài test (id trùng Chart Studio) và nhóm hiển thị
 │   ├── data.js                 # Tải kho.json (GitHub → jsDelivr → cache → snapshot), dựng biểu đồ so sánh
-│   └── app.js                  # Bộ định tuyến hash URL, tìm kiếm, lọc, render biểu đồ
+│   ├── export.js               # Xuất biểu đồ ra ảnh PNG bằng canvas
+│   └── app.js                  # Bộ định tuyến hash URL, tìm kiếm, lọc, so sánh nhiều máy, render biểu đồ
 ├── data/
 │   └── kho-snapshot.js         # Bản dự phòng kho.json (npm run sync-data)
 ├── templates/
