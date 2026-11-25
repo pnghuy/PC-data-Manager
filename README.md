@@ -46,6 +46,31 @@ Web không đọc các file chart trong `data/` của tinhte-charts nữa. Lý d
 
 ---
 
+## 3. Thông tin thêm cho từng máy (`laptops.json`)
+
+Ngày test, link bài review, ảnh, RAM, màn hình, pin… không nằm trong `kho.json` mà trong file `laptops.json` cùng ở gốc repo `tinhte-charts`. Khoá là id máy trong `kho.json`, chỉ cần điền những gì đã có:
+
+```json
+{
+  "acer-nitro-propanel-anv16-core-5-205h-rtx-3050-65w-laptop": {
+    "test_date": "2026-11",
+    "review_url": "https://tinhte.vn/thread/...",
+    "image_url": "https://photo2.tinhte.vn/...",
+    "ram": "16GB",
+    "display": { "size": 16, "refresh_hz": 180, "brightness": 400, "srgb": 100 },
+    "battery": { "wh": 57, "office": 420, "video": "8:15" }
+  }
+}
+```
+
+- Đủ các trường xem ở [`templates/sample-laptop-metadata.json`](templates/sample-laptop-metadata.json).
+- `test_date` ghi `YYYY-MM` hoặc `YYYY-MM-DD`; dùng để sắp xếp "Mới test nhất".
+- Thời lượng pin ghi số phút (`420`) hoặc `"7:00"`, `"7g00p"` đều được.
+- `"hidden": true`: ẩn thẻ máy. `"show": true`: hiện thẻ cho máy chỉ có số tham khảo (ví dụ ASUS ProArt P16), trang máy sẽ ghi rõ "Số tham khảo".
+- Không có `laptops.json` thì web vẫn chạy, chỉ thiếu các thông tin này.
+
+---
+
 ## 4. Các tính năng nổi bật của Website
 
 1. **Tìm kiếm tức thì (Instant Search)**: Tìm theo tên máy, thương hiệu (ASUS, Lenovo, Dell, Acer, Apple...), tên CPU (Ultra 9, Ryzen 9, Snapdragon X...), GPU (RTX 5090, 4080...).

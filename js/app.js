@@ -111,6 +111,7 @@
     const tags = [];
     if (l.brand) tags.push('<span class="tag"><b>' + esc(l.brand) + '</b></span>');
     tags.push('<span class="tag">' + l.testCount + ' bài test</span>');
+    if (!l.measured) tags.push('<span class="tag tag-muted">Số tham khảo</span>');
     if (l.dateLabel) tags.push('<span class="tag tag-muted">' + esc(l.dateLabel) + '</span>');
 
     // Thẻ xem nhanh kết quả nếu đang sắp xếp theo bài test
@@ -133,7 +134,7 @@
 
     // Các điểm test tiêu biểu của máy
     const benchPills = [];
-    l.charts.filter((ch) => !ch.ref).slice(0, 3).forEach((ch) => {
+    l.charts.filter((ch) => !ch.ref || !l.measured).slice(0, 3).forEach((ch) => {
       const hl = ch.items.find((i) => i.highlight);
       if (hl && hl.values[0] != null) {
         const valStr = U.fmtNumber(hl.values[0], ch.decimals) + (ch.unit ? ' ' + ch.unit : '');
@@ -460,7 +461,7 @@
     const r = l.raw;
     document.title = l.name + ' – Kết quả test | ' + LAB.CONFIG.siteName;
 
-    const sub = [l.brand, l.dateLabel ? 'Test ' + l.dateLabel : '', l.variant].filter(Boolean).join(' · ');
+    const sub = [l.brand, l.dateLabel ? 'Test ' + l.dateLabel : '', l.variant, l.measured ? '' : 'Số tham khảo, không do Tinh tế tự đo'].filter(Boolean).join(' · ');
     const info = [
       l.model ? 'Model: <b>' + esc(l.model) + '</b>' : '',
       l.tester ? 'Người test: <b>' + esc(l.tester) + '</b>' : '',

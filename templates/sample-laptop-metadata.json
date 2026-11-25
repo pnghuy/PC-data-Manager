@@ -1,5 +1,5 @@
 {
-  "$schema": "Mẫu file thông tin máy bổ sung cho Tinh tế Laptop Lab",
+  "$schema": "Mẫu thông tin một máy trong laptops.json (repo tinhte-charts), đặt dưới khoá là id máy trong kho.json. Chỉ cần điền trường đã có.",
   "name": "ASUS ROG Zephyrus Duo 16",
   "brand": "ASUS",
   "model": "GX650PY",
@@ -32,6 +32,8 @@
     "charger_w": 330,
     "office": "6g 30p",
     "video": "8g 15p",
-    "gaming": "1g 40p"
-  }
+    "gaming": "1g 40p",
+    "charge_time": 95
+  },
+  "price": "65,99 triệu"
 }

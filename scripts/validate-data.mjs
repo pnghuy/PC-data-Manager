@@ -61,7 +61,7 @@ const snapshotPath = 'data/kho-snapshot.js';
 if (checkFile(snapshotPath)) {
   try {
     const code = fs.readFileSync(path.join(rootDir, snapshotPath), 'utf-8');
-    const match = code.match(/LAB\.KHO_SNAPSHOT\s*=\s*(\{[\s\S]*\});?\s*$/);
+    const match = code.match(/LAB\.KHO_SNAPSHOT\s*=\s*(\{[\s\S]*?\});?\s*(?:LAB\.META_SNAPSHOT|$)/);
     if (!match) throw new Error('không tìm thấy LAB.KHO_SNAPSHOT');
     const kho = JSON.parse(match[1]);
 
