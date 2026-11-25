@@ -10,6 +10,8 @@ Website hoạt động theo mô hình **Zero-Backend (Serverless)**:
 
 ---
 
+> **Làm luân phiên Claude ↔ Antigravity:** đọc [`AGENTS.md`](AGENTS.md) (luật chung) và [`HANDOFF.md`](HANDOFF.md) (trạng thái, việc tiếp theo, quy trình) trước khi làm.
+
 ## 1. Chạy thử trên máy
 
 ```bash
