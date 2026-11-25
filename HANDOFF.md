@@ -11,9 +11,8 @@ Luật chung của repo xem ở `AGENTS.md`.
 - **`main` đang có:**
   - App đọc `kho.json` và `laptops.json` của tinhte-charts, hiện 32 máy
   - Giao diện public theo màu Tinh tế, biểu đồ dạng hàng, có số tham khảo
-- **PR đang mở (chờ anh merge):**
-  - #4 `compare-export`: so sánh 2–4 máy, tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
-  - PR bàn giao này (AGENTS.md, HANDOFF.md, CLAUDE.md, GEMINI.md)
+  - So sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
+- **PR đang mở:** không có (sau khi PR bàn giao này được merge)
 - **Chưa làm:**
   - Deploy public (Cloudflare Pages hoặc GitHub Pages)
   - Ảnh máy và link bài review trong `laptops.json`: hầu hết máy chưa có, cần anh cung cấp
