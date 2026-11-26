@@ -171,20 +171,24 @@
       }
     }
 
-    // Các điểm test tiêu biểu của máy: ưu tiên bài thuộc đúng danh mục đang lọc
+    // Các điểm test tiêu biểu của máy: khi đang lọc theo danh mục, chỉ hiện bài thuộc đúng danh mục đó
     const benchPills = [];
     const ownCharts = l.charts.filter((ch) => !ch.ref || !l.measured);
-    const orderedCharts =
-      state.category !== 'all'
-        ? ownCharts.filter((ch) => ch.category === state.category).concat(ownCharts.filter((ch) => ch.category !== state.category))
-        : ownCharts;
-    orderedCharts.slice(0, 3).forEach((ch) => {
+    let pickedCharts;
+    if (state.category !== 'all') {
+      const ownInCat = ownCharts.filter((ch) => ch.category === state.category);
+      pickedCharts = ownInCat.length ? ownInCat : l.charts.filter((ch) => ch.category === state.category);
+    } else {
+      pickedCharts = ownCharts;
+    }
+    pickedCharts.slice(0, 3).forEach((ch) => {
       const hl = ch.items.find((i) => i.highlight);
       const mainIdx = ch.series.length - 1;
       if (hl && hl.values[mainIdx] != null) {
         const valStr = U.fmtNumber(hl.values[mainIdx], ch.decimals) + (ch.unit ? ' ' + ch.unit : '');
-        const isMatch = state.category !== 'all' && ch.category === state.category;
-        benchPills.push('<span class="bench-pill' + (isMatch ? ' bench-pill-hl' : '') + '">' + esc(ch.title) + ': <b>' + esc(valStr) + '</b></span>');
+        const isMatch = state.category !== 'all';
+        const refSuffix = ch.ref && l.measured ? ' <small>(' + esc(t('refShort')) + ')</small>' : '';
+        benchPills.push('<span class="bench-pill' + (isMatch ? ' bench-pill-hl' : '') + '">' + esc(ch.title) + ': <b>' + esc(valStr) + '</b>' + refSuffix + '</span>');
       }
     });
 
@@ -213,17 +217,7 @@
   function renderHome() {
     document.title = LAB.CONFIG.siteName + ' – ' + t('siteTitle');
 
-    // Xây dựng danh sách sắp xếp
-    const baseSorts = [
-      { id: 'newest', label: t('sortNewest') },
-      { id: 'name', label: t('sortName') },
-      { id: 'tests', label: t('sortTests') },
-    ];
-    const metricSorts = DB.sorts || [];
-    const sortOptions = baseSorts
-      .concat(metricSorts)
-      .map((s) => '<option value="' + esc(s.id) + '"' + (s.id === state.sort ? ' selected' : '') + '>' + esc(s.label) + '</option>')
-      .join('');
+    const sortOptions = buildSortOptionsHtml();
 
     // Dòng nguồn & lưu ý dữ liệu: chỉ hiện cho người quản lý khi mở với ?debug=1 (vd #/?debug=1)
     const debug = parseHash().params.get('debug') === '1';
@@ -445,20 +439,44 @@
         };
       });
     }
+    syncSortSelect();
+  }
+
+  function buildSortOptionsHtml() {
+    const baseSorts = [
+      { id: 'newest', label: t('sortNewest') },
+      { id: 'name', label: t('sortName') },
+      { id: 'tests', label: t('sortTests') },
+    ];
+    const metricSorts = (DB.sorts || []).filter((s) => state.category === 'all' || s.category === state.category);
+    const all = baseSorts.concat(metricSorts);
+    if (!all.some((s) => s.id === state.sort)) state.sort = 'newest';
+    return all
+      .map((s) => '<option value="' + esc(s.id) + '"' + (s.id === state.sort ? ' selected' : '') + '>' + esc(s.label) + '</option>')
+      .join('');
+  }
+
+  function syncSortSelect() {
+    const sortSel = document.getElementById('sort');
+    if (!sortSel) return;
+    sortSel.innerHTML = buildSortOptionsHtml();
+    sortSel.value = state.sort;
   }
 
   // Chọn 2 cột điểm phù hợp với danh mục đang lọc cho chế độ bảng gọn
   function pickTableMetrics(metricKey) {
     const preferredByCat = {
-      cpu: ['cinebench-2024.multi', 'geekbench-6.multi', 'cinebench-r23.multi', 'cinebench-2026.multi'],
-      gpu: ['3dmark-time-spy.score', '3dmark-fire-strike.score', '3dmark-steel-nomad-light.score', '3dmark-port-royal.score'],
+      cpu: ['cinebench-2024.da-nhan', 'geekbench-6.da-nhan', 'cinebench-2026.da-nhan', 'cinebench-r23.da-nhan'],
+      gpu: ['3dmark-time-spy.score', '3dmark-fire-strike.score', '3dmark-steel-nomad-light.score', '3dmark-wild-life-extreme.score'],
       games: ['cyberpunk-2077-1080p-low-settings.score', 'cyberpunk-2077-1080p-low-settings-frame-gen-2x.score'],
-      system: ['pcmark-10.score', 'pcmark-10-applications.score', 'procyon-battery.score'],
-      all: ['cinebench-2024.multi', '3dmark-time-spy.score', 'geekbench-6.multi', 'cinebench-r23.multi'],
+      system: ['pcmark-10.score', 'procyon-battery.score', 'pcmark-10-applications.score'],
+      all: ['cinebench-2024.da-nhan', '3dmark-time-spy.score', 'geekbench-6.da-nhan', 'cinebench-2026.da-nhan'],
     };
     const cols = [];
-    if (metricKey && DB.metrics[metricKey]) cols.push(metricKey);
-    const pref = preferredByCat[state.category] || preferredByCat.all;
+    if (metricKey && DB.metrics[metricKey] && (state.category === 'all' || DB.metrics[metricKey].category === state.category)) {
+      cols.push(metricKey);
+    }
+    const pref = preferredByCat[state.category] || (state.category === 'all' ? preferredByCat.all : []);
     pref.forEach((k) => {
       if (cols.length >= 2) return;
       if (cols.indexOf(k) < 0 && DB.metrics[k] && DB.stats[k]) cols.push(k);
@@ -470,7 +488,7 @@
           if (cols.length < 2 && cols.indexOf(m.key) < 0) cols.push(m.key);
         });
     }
-    if (cols.length < 2) {
+    if (cols.length < 2 && state.category === 'all') {
       (DB.sorts || []).forEach((s) => {
         const k = s.id.slice(2);
         if (cols.length < 2 && cols.indexOf(k) < 0 && DB.metrics[k]) cols.push(k);
@@ -484,7 +502,8 @@
     const shortTitle = (k) => {
       const m = DB.metrics[k];
       if (!m) return k;
-      return m.testTitle ? m.testTitle.replace('Cinebench ', 'CB ').replace('3DMark ', '') : m.label;
+      const base = m.testTitle ? m.testTitle.replace('Cinebench ', 'CB ').replace('3DMark ', '') : m.label;
+      return m.seriesKey && m.seriesKey !== 'score' ? base + ' (' + m.label + ')' : base;
     };
     const rows = list
       .map((l) => {
@@ -527,12 +546,14 @@
       .map((m) => ({ id: 'm:' + m.key, label: m.fullLabel + (m.lowerBetter ? ' (' + t('lowerBetter') + ')' : ''), category: m.category }));
 
     const available = allMetrics.filter((s) => state.category === 'all' || s.category === state.category);
-    const pool = available.length ? available : allMetrics;
-    if (!pool.length) return '<div class="empty">' + esc(t('rankNone')) + '</div>';
+    if (!available.length) {
+      return '<div class="empty">' + esc(state.category === 'all' ? t('rankNone') : t('rankNoCat')) + '</div>';
+    }
+    const pool = available;
 
     let activeKey = state.rankMetric;
     if (!pool.some((s) => s.id === 'm:' + activeKey)) {
-      const pref = ['cinebench-2024.multi', '3dmark-time-spy.score', 'geekbench-6.multi', 'cinebench-r23.multi'];
+      const pref = ['cinebench-2024.da-nhan', '3dmark-time-spy.score', 'geekbench-6.da-nhan', 'cinebench-2026.da-nhan'];
       const found = pref.find((k) => pool.some((s) => s.id === 'm:' + k));
       activeKey = found || pool[0].id.slice(2);
       state.rankMetric = activeKey;
