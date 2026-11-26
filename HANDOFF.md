@@ -7,28 +7,33 @@ Luật chung của repo xem ở `AGENTS.md`.
 
 ## Trạng thái hiện tại
 
-- **Cập nhật lần cuối:** 2026-11-25, Antigravity
+- **Cập nhật lần cuối:** 2026-11-26, Antigravity
 - **`main` đang có:**
   - App đọc `kho.json` và `laptops.json` của tinhte-charts, hiện 32 máy
   - Giao diện public theo màu Tinh tế, biểu đồ dạng hàng, có số tham khảo
   - So sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
   - Đã deploy thử nghiệm trên GitHub Pages (`https://pnghuy.github.io/PC-data-Manager/`) qua workflow `.github/workflows/deploy-pages.yml`
-- **PR đang mở:** `theme-toggle` (thêm nút chuyển giao diện Sáng/Tối trên topbar, lưu lựa chọn vào `localStorage`)
+  - Nút chuyển giao diện Sáng/Tối trên thanh điều hướng (PR #8)
+- **PR đang mở:** `tinhte-theme-and-logo` (bảng màu & phong cách chuẩn Tinhte.vn `#0768ea`, mặc định Light mode, Dark mode xám than `#18191a`, Logo Phương án A cho topbar và favicon, đồng bộ màu xuất PNG)
 - **Chưa làm:**
-  - Thiết kế / thay logo cho trang và favicon
+  - Dàn trang chống cuộn dài (lọc theo hãng, 3 chế độ xem dạng icon ở trang chủ, tóm tắt điểm + tab danh mục ở trang máy)
+  - Đa ngôn ngữ giao diện (Tiếng Việt mặc định + 5 ngôn ngữ phổ biến)
   - Ảnh thực tế máy và link bài review trong `laptops.json` (hầu hết máy chưa có, cần anh cung cấp)
   - Gắn tên miền riêng sau khi hoàn thiện giao diện, logo và ảnh máy
 
 ## Việc tiếp theo (theo thứ tự)
 
-1. **Logo cho trang**
-   - Thay icon laptop mặc định ở góc trái topbar và favicon bằng logo riêng của Tinh tế Laptop Lab.
-2. **Bổ sung `laptops.json` ở tinhte-charts**
+1. **Dàn trang chống cuộn dài**
+   - Trang chủ: lọc nhanh theo hãng + 3 nút icon chuyển chế độ xem (Thẻ máy / Bảng gọn / Xếp hạng).
+   - Trang chi tiết máy: dải tóm tắt điểm nổi bật + tab chuyển nhóm bài test tại chỗ.
+2. **Đa ngôn ngữ giao diện (i18n)**
+   - Mặc định Tiếng Việt, thêm 5 ngôn ngữ phổ biến (English, 中文, 日本語, 한국어, Español) qua nút chọn trên topbar.
+3. **Bổ sung `laptops.json` ở tinhte-charts**
    - Điền `image_url` (ảnh thực tế của máy), `review_url`, màn hình, pin cho các máy đã có bài review.
    - Chỉ điền số có thật.
-3. **Gắn tên miền riêng & public chính thức**
+4. **Gắn tên miền riêng & public chính thức**
    - Sau khi giao diện, logo và ảnh máy đã chỉn chu, gắn tên miền riêng (Cloudflare Pages hoặc GitHub Pages, xem mục 5 `README.md`).
-4. **(Chờ dữ liệu) Geekbench cắm sạc và chạy pin**
+5. **(Chờ dữ liệu) Geekbench cắm sạc và chạy pin**
    - Chỉ làm khi `kho.json` có điểm đo lúc chạy pin, ví dụ thêm id bài test `geekbench-7-battery` ở Chart Studio.
 
 ## Việc đang làm dở
@@ -91,4 +96,5 @@ Muốn làm việc khác thì thay nửa sau của câu bằng việc cụ thể
 | 2026-11-25 | Claude | PR #4: so sánh nhiều máy, tab bài cùng họ, tải PNG |
 | 2026-11-25 | Claude | PR bàn giao: AGENTS.md, HANDOFF.md |
 | 2026-11-25 | Antigravity | PR #7: chuẩn bị deploy (`dist/`, workflow GitHub Pages, hướng dẫn Cloudflare/GitHub Pages) |
-| 2026-11-25 | Antigravity | Thêm nút chuyển giao diện Sáng/Tối trên topbar (lưu `localStorage`) |
+| 2026-11-25 | Antigravity | PR #8: thêm nút chuyển giao diện Sáng/Tối trên topbar (lưu `localStorage`) |
+| 2026-11-26 | Antigravity | Đổi bảng màu & phong cách chuẩn Tinhte.vn (`#0768ea`, mặc định Light mode), thêm Logo Phương án A |

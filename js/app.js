@@ -930,12 +930,8 @@
     if (!btn) return;
     const KEY = 'tinhte-lab-theme';
     const root = document.documentElement;
-    const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
 
-    const currentTheme = () => {
-      if (root.dataset.theme === 'light' || root.dataset.theme === 'dark') return root.dataset.theme;
-      return media && media.matches ? 'light' : 'dark';
-    };
+    const currentTheme = () => (root.dataset.theme === 'dark' ? 'dark' : 'light');
 
     const syncLabel = () => {
       const isLight = currentTheme() === 'light';
@@ -955,9 +951,6 @@
       syncLabel();
     });
 
-    if (media && media.addEventListener) {
-      media.addEventListener('change', syncLabel);
-    }
     syncLabel();
   }
 

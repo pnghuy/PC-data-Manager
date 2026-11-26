@@ -10,8 +10,8 @@
   const LAB = window.LAB;
   const FONT = "'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
   const C = {
-    bg: '#ffffff', text: '#141a26', muted: '#64708a', line: '#e4e9f2', track: '#eef2f8',
-    hlBg: '#e8f4fb', accent: '#0088cc', other: '#9aa6bb', series: ['#0088cc', '#5aaf33', '#f5a623'],
+    bg: '#ffffff', text: '#1c1e21', muted: '#65676b', line: '#e4e6eb', track: '#e9edf3',
+    hlBg: '#e7f1fe', accent: '#0768ea', other: '#9aa4b2', series: ['#0768ea', '#5aaf33', '#f59e0b'],
   };
 
   function wrap(ctx, text, maxW, maxLines) {
