@@ -13,7 +13,7 @@
 
   let DB = null;
   const VIEW_KEY = 'tinhte-lab-view';
-  let savedView = 'grid';
+  let savedView = 'rank';
   try {
     const v = localStorage.getItem(VIEW_KEY);
     if (v === 'grid' || v === 'table' || v === 'rank') savedView = v;
@@ -70,7 +70,7 @@
     if (state.sort && state.sort !== 'newest') p.set('sort', state.sort);
     if (state.category && state.category !== 'all') p.set('cat', state.category);
     if (state.brand && state.brand !== 'all') p.set('b', state.brand);
-    if (state.view && state.view !== 'grid') p.set('v', state.view);
+    if (state.view && state.view !== 'rank') p.set('v', state.view);
     if (state.view === 'rank' && state.rankMetric) p.set('rm', state.rankMetric);
     const s = p.toString();
     return '#/' + (s ? '?' + s : '');
@@ -147,27 +147,24 @@
 
   function card(l, metricKey) {
     const r = l.raw;
-    const tags = [];
-    if (l.brand) tags.push('<span class="tag"><b>' + esc(l.brand) + '</b></span>');
-    tags.push('<span class="tag">' + esc(t('testsCount', { n: l.testCount })) + '</span>');
-    if (!l.measured) tags.push('<span class="tag tag-muted">' + esc(t('refLabel')) + '</span>');
-    if (l.dateLabel) tags.push('<span class="tag tag-muted">' + esc(l.dateLabel) + '</span>');
+    const meta = [l.brand, t('testsCount', { n: l.testCount }), l.dateLabel].filter(Boolean).map(esc);
+    if (!l.measured) meta.push('<span class="ref-tag">' + esc(t('refLabel')) + '</span>');
 
     // Thẻ xem nhanh kết quả nếu đang sắp xếp theo bài test
     let metricBox = '';
     if (metricKey) {
-      const meta = DB.metrics[metricKey] || {};
+      const mm = DB.metrics[metricKey] || {};
       const val = l.v[metricKey];
       if (val != null) {
         const rk = LAB.rankOf(DB, metricKey, val);
         metricBox =
           '<div class="card-metric">' +
-          '<b>' + esc(U.fmtNumber(val, meta.decimals)) + (meta.unit ? ' <small>' + esc(meta.unit) + '</small>' : '') + '</b>' +
-          '<small>' + esc(meta.fullLabel || meta.label || '') + '</small>' +
-          (rk ? '<small class="diff pos">#' + rk.rank + '/' + rk.total + '</small>' : '') +
+          '<b>' + esc(U.fmtNumber(val, mm.decimals)) + (mm.unit ? ' <small>' + esc(mm.unit) + '</small>' : '') + '</b>' +
+          '<small>' + esc(mm.fullLabel || mm.label || '') + '</small>' +
+          (rk ? '<small class="card-rank">#' + rk.rank + '/' + rk.total + '</small>' : '') +
           '</div>';
       } else {
-        metricBox = '<div class="card-metric"><b class="muted">—</b><small>' + esc(meta.fullLabel || '') + '</small></div>';
+        metricBox = '<div class="card-metric"><b class="muted">—</b><small>' + esc(mm.fullLabel || '') + '</small></div>';
       }
     }
 
@@ -186,9 +183,8 @@
       const mainIdx = ch.series.length - 1;
       if (hl && hl.values[mainIdx] != null) {
         const valStr = U.fmtNumber(hl.values[mainIdx], ch.decimals) + (ch.unit ? ' ' + ch.unit : '');
-        const isMatch = state.category !== 'all';
         const refSuffix = ch.ref && l.measured ? ' <small>(' + esc(t('refShort')) + ')</small>' : '';
-        benchPills.push('<span class="bench-pill' + (isMatch ? ' bench-pill-hl' : '') + '">' + esc(ch.title) + ': <b>' + esc(valStr) + '</b>' + refSuffix + '</span>');
+        benchPills.push('<div class="bench-row"><span>' + esc(ch.title) + refSuffix + '</span><b>' + esc(valStr) + '</b></div>');
       }
     });
 
@@ -197,12 +193,12 @@
       '<a class="card" href="#/may/' + encodeURIComponent(l.id) + '">' +
       thumb(l, 'card-thumb') +
       '<div class="card-body">' +
-      '<div class="card-title">' + esc(l.name) + '</div>' +
+      '<div class="card-title">' + esc(fullName(l)) + '</div>' +
       '<div class="card-spec">' +
       (r.cpu ? '<div><span>CPU</span> ' + esc(r.cpu) + '</div>' : '') +
       (r.gpu ? '<div><span>GPU</span> ' + esc(r.gpu) + '</div>' : '') +
       '</div>' +
-      (tags.length ? '<div class="card-tags">' + tags.join('') + '</div>' : '') +
+      '<div class="card-meta">' + meta.join(' · ') + '</div>' +
       (benchPills.length ? '<div class="card-benchs">' + benchPills.join('') + '</div>' : '') +
       '</div>' +
       metricBox +
@@ -273,9 +269,9 @@
     app.innerHTML =
       syncStatus +
       issuesBox +
-      '<section class="hero">' +
-      '<h1>' + esc(t('heroTitle')) + '</h1>' +
-      '<p>' + esc(t('heroDesc')) + '</p>' +
+      '<section class="page-head">' +
+      '<div class="page-title"><h1>' + esc(t('heroTitle')) + '</h1>' +
+      '<p>' + esc(t('heroDesc')) + '</p></div>' +
       '<label class="search">' +
       '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
       '<input id="q" type="search" autocomplete="off" placeholder="' + esc(t('searchPh')) + '" value="' +
@@ -518,7 +514,7 @@
           .join('');
         return (
           '<tr>' +
-          '<td><a class="ctbl-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(l.name) + '</a>' +
+          '<td><a class="ctbl-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(fullName(l)) + '</a>' +
           (l.variant ? '<div class="ctbl-sub">' + esc(l.variant) + '</div>' : '') +
           '</td>' +
           '<td class="ctbl-spec">' + esc(spec || '—') + '</td>' +
@@ -543,19 +539,17 @@
     const allMetrics = Object.values(DB.metrics)
       .filter((m) => !m.noRank && m.type !== 'text' && DB.stats[m.key] && DB.stats[m.key].values.length >= 1)
       .sort((a, b) => LAB.SECTION_ORDER.indexOf(a.category) - LAB.SECTION_ORDER.indexOf(b.category) || (a.fullLabel || '').localeCompare(b.fullLabel || '', 'vi'))
-      .map((m) => ({ id: 'm:' + m.key, label: m.fullLabel + (m.lowerBetter ? ' (' + t('lowerBetter') + ')' : ''), category: m.category }));
+      .map((m) => ({ key: m.key, label: m.fullLabel + (m.lowerBetter ? ' (' + t('lowerBetter') + ')' : ''), category: m.category }));
 
-    const available = allMetrics.filter((s) => state.category === 'all' || s.category === state.category);
-    if (!available.length) {
+    const pool = allMetrics.filter((s) => state.category === 'all' || s.category === state.category);
+    if (!pool.length) {
       return '<div class="empty">' + esc(state.category === 'all' ? t('rankNone') : t('rankNoCat')) + '</div>';
     }
-    const pool = available;
 
     let activeKey = state.rankMetric;
-    if (!pool.some((s) => s.id === 'm:' + activeKey)) {
+    if (!pool.some((s) => s.key === activeKey)) {
       const pref = ['cinebench-2024.da-nhan', '3dmark-time-spy.score', 'geekbench-6.da-nhan', 'cinebench-2026.da-nhan'];
-      const found = pref.find((k) => pool.some((s) => s.id === 'm:' + k));
-      activeKey = found || pool[0].id.slice(2);
+      activeKey = pref.find((k) => pool.some((s) => s.key === k)) || pool[0].key;
       state.rankMetric = activeKey;
     }
 
@@ -565,55 +559,62 @@
       .filter((l) => l.measured && l.v[activeKey] != null)
       .sort((a, b) => (lower ? a.v[activeKey] - b.v[activeKey] : b.v[activeKey] - a.v[activeKey]));
 
-    const optsHtml = pool
+    // Cột trái: danh sách bài test theo nhóm (điện thoại dùng ô chọn)
+    const catTitles = { cpu: t('catCpu'), gpu: t('catGpu'), games: t('catGames'), ai: t('catAi'), system: t('catSystem') };
+    const countOf = (k) => list.filter((l) => l.measured && l.v[k] != null).length;
+    let lastCat = '';
+    const side = pool
       .map((s) => {
-        const k = s.id.slice(2);
-        return '<option value="' + esc(k) + '"' + (k === activeKey ? ' selected' : '') + '>' + esc(s.label) + '</option>';
+        const head = s.category !== lastCat ? '<div class="lb-side-h">' + esc(catTitles[s.category] || t('catOther')) + '</div>' : '';
+        lastCat = s.category;
+        const on = s.key === activeKey;
+        return head + '<button type="button" class="lb-side-item' + (on ? ' active' : '') + '" data-rm="' + esc(s.key) + '" aria-pressed="' + on + '">' +
+          '<span>' + esc(s.label) + '</span><i>' + countOf(s.key) + '</i></button>';
       })
       .join('');
+    const optsHtml = pool
+      .map((s) => '<option value="' + esc(s.key) + '"' + (s.key === activeKey ? ' selected' : '') + '>' + esc(s.label) + '</option>')
+      .join('');
 
+    const head =
+      '<div class="lb-head">' +
+      '<div><h2>' + esc(meta.fullLabel || activeKey) + '</h2>' +
+      '<div class="lb-desc">' + esc(lower ? t('lowerBetterDesc') : t('higherBetterDesc')) + '. ' + esc(t('rankMeasured', { n: ranked.length })) + '.</div></div>' +
+      '<select class="lb-sel" id="rankMetricSel" aria-label="' + esc(t('rankSelectAria')) + '">' + optsHtml + '</select>' +
+      '</div>';
+
+    let body;
     if (!ranked.length) {
-      return (
-        '<div class="lb-card">' +
-        '<div class="lb-head"><select class="lb-sel" id="rankMetricSel">' + optsHtml + '</select></div>' +
-        '<div class="empty" style="border:0">' + esc(t('rankNoMatch')) + '</div>' +
-        '</div>'
-      );
+      body = '<div class="empty">' + esc(t('rankNoMatch')) + '</div>';
+    } else {
+      const vals = ranked.map((l) => l.v[activeKey]);
+      const maxV = Math.max(...vals);
+      const minV = Math.min(...vals);
+      body =
+        '<div class="lb-list">' +
+        ranked
+          .map((l, idx) => {
+            const v = l.v[activeKey];
+            const pct = lower ? (v > 0 && minV > 0 ? (minV / v) * 100 : 100) : maxV > 0 ? (v / maxV) * 100 : 0;
+            const w = Math.max(2, Math.min(100, pct)).toFixed(1);
+            const sub = meta.category === 'gpu' || meta.category === 'games' ? l.raw.gpu : meta.category === 'cpu' ? l.raw.cpu : [l.raw.cpu, l.raw.gpu].filter(Boolean).join(' · ');
+            return (
+              '<div class="lb-row">' +
+              '<span class="lb-rank">' + (idx + 1) + '</span>' +
+              '<div class="lb-info"><a class="lb-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(dispName(l)) + '</a>' +
+              (sub ? '<div class="lb-sub">' + esc(sub) + '</div>' : '') +
+              '</div>' +
+              '<div class="lb-bar"><span style="width:' + w + '%"></span></div>' +
+              '<div class="lb-val">' + esc(U.fmtNumber(v, meta.decimals)) + (meta.unit ? ' <small>' + esc(meta.unit) + '</small>' : '') + '</div>' +
+              '<div class="lb-act">' + cmpButton(l.id, 'cmp-toggle') + '</div>' +
+              '</div>'
+            );
+          })
+          .join('') +
+        '</div>';
     }
 
-    const vals = ranked.map((l) => l.v[activeKey]);
-    const maxV = Math.max(...vals);
-    const minV = Math.min(...vals);
-
-    const rowsHtml = ranked
-      .map((l, idx) => {
-        const v = l.v[activeKey];
-        const pct = lower ? (v > 0 && minV > 0 ? (minV / v) * 100 : 100) : maxV > 0 ? (v / maxV) * 100 : 0;
-        const w = Math.max(4, Math.min(100, pct)).toFixed(1);
-        const sub = meta.category === 'gpu' || meta.category === 'games' ? l.raw.gpu : meta.category === 'cpu' ? l.raw.cpu : [l.raw.cpu, l.raw.gpu].filter(Boolean).join(' · ');
-        return (
-          '<div class="lb-row">' +
-          '<span class="lb-rank' + (idx < 3 ? ' top' : '') + '">#' + (idx + 1) + '</span>' +
-          '<div class="lb-info"><a class="lb-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(l.name) + '</a>' +
-          (sub ? '<div class="lb-sub">' + esc(sub) + '</div>' : '') +
-          '</div>' +
-          '<div class="lb-bar-wrap"><div class="chart-track"><div class="chart-fill" style="width:' + w + '%;background:' + (idx === 0 ? 'var(--accent)' : 'var(--series-1)') + ';opacity:' + (idx === 0 ? '1' : '0.78') + '"></div></div>' +
-          '<div class="lb-val">' + esc(U.fmtNumber(v, meta.decimals)) + (meta.unit ? ' <small>' + esc(meta.unit) + '</small>' : '') + '</div></div>' +
-          '<div class="lb-act">' + cmpButton(l.id, 'cmp-toggle') + '</div>' +
-          '</div>'
-        );
-      })
-      .join('');
-
-    return (
-      '<div class="lb-card">' +
-      '<div class="lb-head">' +
-      '<select class="lb-sel" id="rankMetricSel" aria-label="' + esc(t('rankSelectAria')) + '">' + optsHtml + '</select>' +
-      '<span class="muted" style="font-size:12.5px">' + esc(t('rankMeasured', { n: ranked.length })) + ' · ' + esc(lower ? t('lowerBetterDesc') : t('higherBetterDesc')) + '</span>' +
-      '</div>' +
-      '<div class="lb-list">' + rowsHtml + '</div>' +
-      '</div>'
-    );
+    return '<div class="lb"><nav class="lb-side" aria-label="' + esc(t('rankSelectAria')) + '">' + side + '</nav><div class="lb-main">' + head + body + '</div></div>';
   }
 
   function updateResults() {
@@ -639,14 +640,14 @@
     if (state.view === 'rank') {
       results.innerHTML = renderRankView(list);
       more.innerHTML = '';
+      const pickMetric = (k) => {
+        state.rankMetric = k;
+        history.replaceState(null, '', homeHash());
+        updateResults();
+      };
       const sel = document.getElementById('rankMetricSel');
-      if (sel) {
-        sel.onchange = () => {
-          state.rankMetric = sel.value;
-          history.replaceState(null, '', homeHash());
-          updateResults();
-        };
-      }
+      if (sel) sel.onchange = () => pickMetric(sel.value);
+      results.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => pickMetric(b.dataset.rm); });
       results.querySelectorAll('.cmp-toggle').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
       return;
     }
@@ -698,7 +699,7 @@
     // Thứ hạng của máy này trong số các máy Tinh tế tự đo cùng bài test
     let rankBadge = '';
     if (ch.rank && ch.rank.total > 1) {
-      rankBadge = '<span class="chart-badge" style="color:var(--good);border-color:color-mix(in srgb, var(--good) 40%, var(--line));">' + esc(t('rankBadge', { rank: ch.rank.rank, total: ch.rank.total })) + '</span>';
+      rankBadge = '<span class="chart-badge chart-rank">' + esc(t('rankBadge', { rank: ch.rank.rank, total: ch.rank.total })) + '</span>';
     }
     if (ch.ref) rankBadge = '<span class="chart-badge">' + esc(t('refLabel')) + '</span>';
     if (opts.compare) rankBadge = '';
@@ -814,7 +815,13 @@
 
   // Tên kèm cấu hình khi có nhiều máy trùng tên (vd ba bản Acer Nitro ProPanel)
   function dispName(l) {
-    return l.variant ? l.name + ' (' + l.variant + ')' : l.name;
+    return l.variant ? fullName(l) + ' (' + l.variant + ')' : fullName(l);
+  }
+
+  // Tên máy giữ đủ thương hiệu (vd "Strix SCAR 18 2026" → "ASUS Strix SCAR 18 2026")
+  function fullName(l) {
+    if (!l.brand || U.normalize(l.name).indexOf(U.normalize(l.brand)) === 0) return l.name;
+    return l.brand + ' ' + l.name;
   }
 
   function cmpButton(id, cls) {
@@ -911,7 +918,7 @@
       window.scrollTo(0, 0);
       return;
     }
-    document.title = list.map((l) => l.name).join(' vs ') + ' – ' + LAB.CONFIG.siteName;
+    document.title = list.map((l) => fullName(l)).join(' vs ') + ' – ' + LAB.CONFIG.siteName;
 
     // Đầu trang: mỗi máy một cột
     const heads = list
@@ -919,7 +926,7 @@
         (l) =>
           '<div class="cmp-head">' +
           thumb(l, 'card-thumb') +
-          '<a class="cmp-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(l.name) + '</a>' +
+          '<a class="cmp-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(fullName(l)) + '</a>' +
           '<div class="cmp-chip">' + esc([l.raw.cpu, l.raw.gpu].filter(Boolean).join(' · ')) + '</div>' +
           (l.measured ? '' : '<span class="tag tag-muted">' + esc(t('refLabel')) + '</span>') +
           '<button type="button" class="cmp-remove" data-remove="' + esc(l.id) + '">' + esc(t('cmpRemove')) + '</button>' +
@@ -1002,8 +1009,56 @@
       };
     });
 
+    // Bảng điểm: mỗi hàng một bài test (chỉ số Tinh tế đo), ô cao nhất tô màu, ô khác ghi % chênh
+    const scoreKeys = Object.values(DB.metrics)
+      .filter((m) => m.dynamic && list.some((l) => l.v[m.key] != null))
+      .sort((a, b) =>
+        LAB.SECTION_ORDER.indexOf(a.category) - LAB.SECTION_ORDER.indexOf(b.category) ||
+        (a.testTitle || '').localeCompare(b.testTitle || '', 'vi') ||
+        (a.seriesKey === 'score' ? 0 : 1) - (b.seriesKey === 'score' ? 0 : 1) ||
+        (a.label || '').localeCompare(b.label || '', 'vi'));
+    let lastScoreCat = '';
+    const catShort = { cpu: t('catCpuFull'), gpu: t('catGpuFull'), games: t('catGamesFull'), ai: t('catAiFull'), system: t('catSystemFull') };
+    const scoreRows = scoreKeys
+      .map((m) => {
+        const vals = list.map((l) => l.v[m.key]);
+        const nums = vals.filter((x) => x != null);
+        const best = nums.length >= 2 ? (m.lowerBetter ? Math.min(...nums) : Math.max(...nums)) : null;
+        const groupRow = m.category !== lastScoreCat ? '<tr class="cmp-group"><th colspan="' + (cols + 1) + '">' + esc(catShort[m.category] || t('catOther')) + '</th></tr>' : '';
+        lastScoreCat = m.category;
+        const label = m.seriesKey && m.seriesKey !== 'score' ? esc(m.testTitle) + '<small>' + esc(m.label) + (m.lowerBetter ? ', ' + esc(t('lowerBetter')) : '') + '</small>' : esc(m.testTitle || m.label) + (m.lowerBetter ? '<small>' + esc(t('lowerBetter')) + '</small>' : '');
+        return (
+          groupRow +
+          '<tr><th scope="row">' + label + '</th>' +
+          vals
+            .map((v) => {
+              if (v == null) return '<td class="nil">—</td>';
+              const isBest = best != null && v === best;
+              let note = '';
+              if (best != null && !isBest && best) {
+                const pct = m.lowerBetter ? (best / v - 1) * 100 : (v / best - 1) * 100;
+                note = '<em>' + (Math.abs(pct) < 0.05 ? '≈' : (pct > 0 ? '+' : '−') + Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0) + '%') + '</em>';
+              } else if (isBest) note = '<em>' + esc(t('bestShort')) + '</em>';
+              const w = best ? Math.max(2, Math.min(100, m.lowerBetter ? (best / v) * 100 : (v / best) * 100)) : 100;
+              return '<td' + (isBest ? ' class="best"' : '') + '><span class="sv">' + esc(U.fmtNumber(v, m.decimals)) + '</span>' + note +
+                (best != null ? '<span class="sm"><span style="width:' + w.toFixed(1) + '%"></span></span>' : '') + '</td>';
+            })
+            .join('') +
+          '</tr>'
+        );
+      })
+      .join('');
+    const scoreTable = scoreRows
+      ? '<section class="panel" id="sec-scores"><h2>' + esc(t('cmpScores')) + '</h2>' +
+        '<div class="cmp-table-wrap"><table class="cmp-table cmp-scores" style="--cols:' + cols + '">' +
+        '<thead><tr><th></th>' + list.map((l) => '<th scope="col">' + esc(dispName(l)) + '</th>').join('') + '</tr></thead>' +
+        '<tbody>' + scoreRows + '</tbody></table></div>' +
+        '<p class="kpi-note">' + esc(t('cmpScoresNote')) + '</p></section>'
+      : '';
+
     const sections = [];
-    const toc = ['<button type="button" data-target="sec-specs">' + esc(t('cmpSpecs')) + '</button>'];
+    const toc = (scoreTable ? ['<button type="button" data-target="sec-scores">' + esc(t('cmpScores')) + '</button>'] : [])
+      .concat('<button type="button" data-target="sec-specs">' + esc(t('cmpSpecs')) + '</button>');
     const catTitles = { cpu: t('catCpuFull'), gpu: t('catGpuFull'), games: t('catGamesFull'), ai: t('catAiFull'), system: t('catSystemFull'), other: t('catOther') };
     LAB.SECTION_ORDER.forEach((cat) => {
       const cs = charts
@@ -1027,6 +1082,7 @@
       '</div></section>' +
       '<div class="cmp-heads" style="--cols:' + cols + '">' + heads + '</div>' +
       '<nav class="toc">' + toc.join('') + '</nav>' +
+      scoreTable +
       '<section class="panel" id="sec-specs"><h2>' + esc(t('cmpSpecs')) + '</h2><div class="cmp-table-wrap"><table class="cmp-table" style="--cols:' + cols + '">' +
       '<thead><tr><th></th>' + list.map((l) => '<th scope="col">' + esc(dispName(l)) + '</th>').join('') + '</tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>' +
@@ -1047,6 +1103,25 @@
 
   /* ---------- Render Trang Chi Tiết ---------- */
 
+  // Dải phân bố: mỗi vạch là một máy Tinh tế đo, vạch đậm là máy đang xem
+  function distStrip(key, value) {
+    const st = DB.stats[key];
+    if (!st || st.values.length < 3 || st.max === st.min) return '';
+    const lower = !!(DB.metrics[key] || {}).lowerBetter;
+    const pos = (v) => {
+      const p = ((v - st.min) / (st.max - st.min)) * 100;
+      return (lower ? 100 - p : p).toFixed(1);
+    };
+    let selfDone = false;
+    const ticks = st.values
+      .map((v) => {
+        if (!selfDone && v === value) { selfDone = true; return ''; }
+        return '<i style="left:' + pos(v) + '%"></i>';
+      })
+      .join('');
+    return '<span class="dist" aria-hidden="true">' + ticks + '<b style="left:' + pos(value) + '%"></b></span>';
+  }
+
   function renderDetail(id) {
     RENDERED = [];
     const l = DB.byId[id];
@@ -1059,7 +1134,7 @@
     }
 
     const r = l.raw;
-    document.title = l.name + ' – ' + t('detailTitleSuffix') + ' | ' + LAB.CONFIG.siteName;
+    document.title = fullName(l) + ' – ' + t('detailTitleSuffix') + ' | ' + LAB.CONFIG.siteName;
 
     const sub = [l.brand, l.dateLabel ? t('testDatePrefix', { d: l.dateLabel }) : '', l.variant, l.measured ? '' : t('refLong')].filter(Boolean).join(' · ');
     const info = [
@@ -1108,12 +1183,14 @@
         const val = hl && hl.values[mainIdx];
         if (val == null) return;
         seenCats[ch.category] = true;
+        const key = ch.ref ? null : ch.testKey + '.' + ch.series[mainIdx].key;
         kpis.push({
+          dist: key ? distStrip(key, val) : '',
           cat: 'sec-' + (catMap[ch.category] ? ch.category : 'other'),
           label: ch.title,
           val: U.fmtNumber(val, ch.decimals),
           unit: ch.unit || '',
-          rank: ch.rank && ch.rank.total > 1 ? '#' + ch.rank.rank + '/' + ch.rank.total : '',
+          rank: ch.rank && ch.rank.total > 1 ? ch.rank.rank + '/' + ch.rank.total : '',
         });
       });
     const kpiHtml =
@@ -1125,11 +1202,13 @@
                 '<button type="button" class="kpi-card" data-jump="' + esc(k.cat) + '">' +
                 '<span class="kpi-label">' + esc(k.label) + '</span>' +
                 '<span class="kpi-val"><b>' + esc(k.val) + '</b>' + (k.unit ? ' <small>' + esc(k.unit) + '</small>' : '') +
-                (k.rank ? ' <em class="kpi-rank">' + esc(k.rank) + '</em>' : '') +
-                '</span></button>'
+                '</span>' + k.dist +
+                (k.rank ? '<span class="kpi-rank">' + esc(t('kpiRank', { r: k.rank })) + '</span>' : '') +
+                '</button>'
             )
             .join('') +
-          '</div>'
+          '</div>' +
+          (kpis.some((k) => k.dist) ? '<p class="kpi-note">' + esc(t('distHint')) + '</p>' : '')
         : '';
 
     // Tạo các tab nội dung (bấm tab chuyển nhóm ngay, kèm tab "Tất cả")
@@ -1213,7 +1292,7 @@
       thumb(l, 'detail-thumb') +
       '<div class="detail-head">' +
       (sub ? '<div class="eyebrow">' + esc(sub) + '</div>' : '') +
-      '<h1>' + esc(l.name) + '</h1>' +
+      '<h1>' + esc(fullName(l)) + '</h1>' +
       (info.length ? '<div class="detail-info">' + info.join('<span class="dot">•</span>') + '</div>' : '') +
       '<div class="actions">' +
       (l.review ? '<a class="btn" href="' + esc(l.review) + '" target="_blank" rel="noopener">' + esc(t('reviewBtn')) + '</a>' : '') +
