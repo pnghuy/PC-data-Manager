@@ -12,9 +12,10 @@ Luật chung của repo xem ở `AGENTS.md`.
   - App đọc `kho.json` và `laptops.json` của tinhte-charts, hiện 32 máy
   - Giao diện public chuẩn màu & phong cách Tinhte.vn (`#0768ea`, mặc định Light mode, Dark mode xám than `#18191a`) + Logo Phương án A (PR #9)
   - Nút chuyển Sáng/Tối (PR #8), dàn trang chống cuộn dài với lọc hãng + 3 nút icon chế độ xem + dải KPI & tab trang máy (PR #10)
+  - Đa ngôn ngữ giao diện 6 thứ tiếng (`vi` mặc định + `en`, `zh`, `ja`, `ko`, `es`) và bộ lọc chéo Danh mục × Hãng đồng bộ với thẻ máy, bảng gọn, sắp xếp, bảng xếp hạng (PR #11)
   - So sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
   - Đã deploy thử nghiệm trên GitHub Pages (`https://pnghuy.github.io/PC-data-Manager/`) qua workflow `.github/workflows/deploy-pages.yml`
-- **PR đang mở:** `i18n-multilang` (đa ngôn ngữ giao diện: Tiếng Việt mặc định + 5 ngôn ngữ phổ biến English, 中文, 日本語, 한국어, Español qua bộ chọn trên topbar)
+- **PR đang mở:** Không có.
 - **Chưa làm:**
   - Ảnh thực tế máy và link bài review trong `laptops.json` (hầu hết máy chưa có, cần anh cung cấp)
   - Gắn tên miền riêng sau khi hoàn thiện ảnh máy
@@ -92,4 +93,4 @@ Muốn làm việc khác thì thay nửa sau của câu bằng việc cụ thể
 | 2026-11-25 | Antigravity | PR #8: thêm nút chuyển giao diện Sáng/Tối trên topbar (lưu `localStorage`) |
 | 2026-11-26 | Antigravity | PR #9: bảng màu & phong cách chuẩn Tinhte.vn (`#0768ea`, mặc định Light mode), Logo Phương án A |
 | 2026-11-26 | Antigravity | PR #10: dàn trang chống cuộn dài (lọc hãng, 3 nút icon chuyển chế độ xem, dải KPI + tab trang máy) |
-| 2026-11-26 | Antigravity | Thêm đa ngôn ngữ giao diện (Tiếng Việt mặc định + English, 中文, 日本語, 한국어, Español) |
+| 2026-11-26 | Antigravity | PR #11: đa ngôn ngữ 6 thứ tiếng (`vi`/`en`/`zh`/`ja`/`ko`/`es`) + sửa lọc chéo Danh mục × Hãng, chống lẫn bài test khác danh mục trên thẻ/bảng/sắp xếp/xếp hạng |
