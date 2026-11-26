@@ -11,10 +11,20 @@
   const app = document.getElementById('app');
 
   let DB = null;
+  const VIEW_KEY = 'tinhte-lab-view';
+  let savedView = 'grid';
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    if (v === 'grid' || v === 'table' || v === 'rank') savedView = v;
+  } catch (e) { /* bỏ qua */ }
+
   const state = {
     q: '',
     sort: 'newest',
     category: 'all',
+    brand: 'all',
+    view: savedView,
+    rankMetric: '',
     shown: LAB.CONFIG.pageSize || 24,
     showIssues: false,
     compare: [], // id các máy đang chọn để so sánh (tối đa CMP_MAX)
@@ -58,6 +68,9 @@
     if (state.q) p.set('q', state.q);
     if (state.sort && state.sort !== 'newest') p.set('sort', state.sort);
     if (state.category && state.category !== 'all') p.set('cat', state.category);
+    if (state.brand && state.brand !== 'all') p.set('b', state.brand);
+    if (state.view && state.view !== 'grid') p.set('v', state.view);
+    if (state.view === 'rank' && state.rankMetric) p.set('rm', state.rankMetric);
     const s = p.toString();
     return '#/' + (s ? '?' + s : '');
   }
@@ -79,6 +92,10 @@
     state.q = params.get('q') || '';
     state.sort = params.get('sort') || 'newest';
     state.category = params.get('cat') || 'all';
+    state.brand = params.get('b') || 'all';
+    const vParam = params.get('v');
+    if (vParam === 'grid' || vParam === 'table' || vParam === 'rank') state.view = vParam;
+    if (params.get('rm')) state.rankMetric = params.get('rm');
     state.shown = LAB.CONFIG.pageSize || 24;
     renderHome();
     renderTray();
@@ -91,6 +108,7 @@
     let list = DB.laptops.filter((l) => {
       const matchText = tokens.every((t) => l.search.includes(t));
       if (!matchText) return false;
+      if (state.brand !== 'all' && l.brand !== state.brand) return false;
       if (state.category !== 'all') {
         const hasCat = l.charts.some((ch) => ch.category === state.category);
         if (!hasCat) return false;
@@ -258,6 +276,45 @@
         '</ul></div>';
     }
 
+    // Thanh lọc theo hãng (tự sinh từ dữ liệu thật)
+    const brandCounts = {};
+    DB.laptops.forEach((l) => { if (l.brand) brandCounts[l.brand] = (brandCounts[l.brand] || 0) + 1; });
+    const brandList = Object.keys(brandCounts).sort((a, b) => brandCounts[b] - brandCounts[a] || a.localeCompare(b, 'vi'));
+    const brandRow =
+      brandList.length >= 2
+        ? '<div class="brand-chips" aria-label="Lọc theo hãng">' +
+          '<button type="button" class="bchip' + (state.brand === 'all' ? ' active' : '') + '" data-brand="all">Tất cả hãng</button>' +
+          brandList
+            .map(
+              (b) =>
+                '<button type="button" class="bchip' +
+                (state.brand === b ? ' active' : '') +
+                '" data-brand="' +
+                esc(b) +
+                '">' +
+                esc(b) +
+                ' <span>' +
+                brandCounts[b] +
+                '</span></button>'
+            )
+            .join('') +
+          '</div>'
+        : '';
+
+    // 3 nút icon chuyển chế độ xem (không ghi chữ)
+    const viewSwitch =
+      '<div class="view-switch" role="group" aria-label="Chế độ hiển thị">' +
+      '<button type="button" class="vbtn' + (state.view === 'grid' ? ' active' : '') + '" data-view="grid" aria-pressed="' + (state.view === 'grid') + '" aria-label="Dạng thẻ" title="Dạng thẻ">' +
+      '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.2"/><rect x="11" y="3" width="6" height="6" rx="1.2"/><rect x="3" y="11" width="6" height="6" rx="1.2"/><rect x="11" y="11" width="6" height="6" rx="1.2"/></svg>' +
+      '</button>' +
+      '<button type="button" class="vbtn' + (state.view === 'table' ? ' active' : '') + '" data-view="table" aria-pressed="' + (state.view === 'table') + '" aria-label="Dạng bảng gọn" title="Dạng bảng gọn">' +
+      '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg>' +
+      '</button>' +
+      '<button type="button" class="vbtn' + (state.view === 'rank' ? ' active' : '') + '" data-view="rank" aria-pressed="' + (state.view === 'rank') + '" aria-label="Bảng xếp hạng" title="Bảng xếp hạng">' +
+      '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="10" width="3.5" height="7" rx="0.8"/><rect x="8.25" y="4" width="3.5" height="13" rx="0.8"/><rect x="13.5" y="7" width="3.5" height="10" rx="0.8"/></svg>' +
+      '</button>' +
+      '</div>';
+
     app.innerHTML =
       syncStatus +
       issuesBox +
@@ -272,11 +329,15 @@
       '</label>' +
       '</section>' +
       '<div class="filter-chips">' + catChips + '</div>' +
+      brandRow +
       '<div class="toolbar">' +
       '<div id="count" class="muted"></div>' +
-      '<label class="sort">Sắp xếp <select id="sort">' + sortOptions + '</select></label>' +
+      '<div class="toolbar-right">' +
+      '<label class="sort" id="sortWrap"' + (state.view === 'rank' ? ' hidden' : '') + '>Sắp xếp <select id="sort">' + sortOptions + '</select></label>' +
+      viewSwitch +
       '</div>' +
-      '<div id="grid" class="grid"></div>' +
+      '</div>' +
+      '<div id="results"></div>' +
       '<div id="more" class="more"></div>';
 
     // Gắn sự kiện
@@ -308,6 +369,32 @@
       };
     });
 
+    app.querySelectorAll('.brand-chips .bchip').forEach((btn) => {
+      btn.onclick = () => {
+        state.brand = btn.dataset.brand;
+        state.shown = LAB.CONFIG.pageSize || 24;
+        app.querySelectorAll('.brand-chips .bchip').forEach((b) => b.classList.toggle('active', b === btn));
+        history.replaceState(null, '', homeHash());
+        updateResults();
+      };
+    });
+
+    app.querySelectorAll('.view-switch .vbtn').forEach((btn) => {
+      btn.onclick = () => {
+        state.view = btn.dataset.view;
+        try { localStorage.setItem(VIEW_KEY, state.view); } catch (e) { /* bỏ qua */ }
+        app.querySelectorAll('.view-switch .vbtn').forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', on);
+        });
+        const sw = document.getElementById('sortWrap');
+        if (sw) sw.hidden = state.view === 'rank';
+        history.replaceState(null, '', homeHash());
+        updateResults();
+      };
+    });
+
     const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
       refreshBtn.onclick = () => {
@@ -329,25 +416,183 @@
     updateResults();
   }
 
+  // Chọn 2 cột điểm phổ biến nhất cho chế độ bảng gọn
+  function pickTableMetrics(metricKey) {
+    const preferred = [
+      'cinebench-2024.multi',
+      'cinebench-r23.multi',
+      'geekbench-6.multi',
+      '3dmark-time-spy.score',
+      '3dmark-steel-nomad.score',
+    ];
+    const cols = [];
+    if (metricKey && DB.metrics[metricKey]) cols.push(metricKey);
+    preferred.forEach((k) => {
+      if (cols.length >= 2) return;
+      if (cols.indexOf(k) < 0 && DB.metrics[k] && DB.stats[k]) cols.push(k);
+    });
+    if (cols.length < 2) {
+      (DB.sorts || []).forEach((s) => {
+        const k = s.id.slice(2);
+        if (cols.length < 2 && cols.indexOf(k) < 0 && DB.metrics[k]) cols.push(k);
+      });
+    }
+    return cols;
+  }
+
+  function renderTableView(list, metricKey) {
+    const cols = pickTableMetrics(metricKey);
+    const shortTitle = (k) => {
+      const m = DB.metrics[k];
+      if (!m) return k;
+      return m.testTitle ? m.testTitle.replace('Cinebench ', 'CB ').replace('3DMark ', '') : m.label;
+    };
+    const rows = list
+      .map((l) => {
+        const spec = [l.raw.cpu, l.raw.gpu].filter(Boolean).join(' · ');
+        const cells = cols
+          .map((k) => {
+            const val = l.v[k];
+            const m = DB.metrics[k] || {};
+            if (val == null) return '<td class="num muted">—</td>';
+            return '<td class="num">' + esc(U.fmtNumber(val, m.decimals)) + '</td>';
+          })
+          .join('');
+        return (
+          '<tr>' +
+          '<td><a class="ctbl-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(l.name) + '</a>' +
+          (l.variant ? '<div class="ctbl-sub">' + esc(l.variant) + '</div>' : '') +
+          '</td>' +
+          '<td class="ctbl-spec">' + esc(spec || '—') + '</td>' +
+          cells +
+          '<td class="ctbl-act">' + cmpButton(l.id, 'cmp-toggle') + '</td>' +
+          '</tr>'
+        );
+      })
+      .join('');
+    return (
+      '<div class="ctbl-wrap"><table class="ctbl">' +
+      '<thead><tr>' +
+      '<th>Mẫu laptop</th><th>CPU / GPU</th>' +
+      cols.map((k) => '<th class="num">' + esc(shortTitle(k)) + '</th>').join('') +
+      '<th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>'
+    );
+  }
+
+  function renderRankView(list) {
+    const available = (DB.sorts || []).filter((s) => state.category === 'all' || s.category === state.category);
+    const pool = available.length ? available : DB.sorts || [];
+    if (!pool.length) return '<div class="empty">Chưa có bài test nào đủ dữ liệu để xếp hạng.</div>';
+
+    let activeKey = state.rankMetric;
+    if (!pool.some((s) => s.id === 'm:' + activeKey)) {
+      const pref = ['cinebench-2024.multi', '3dmark-time-spy.score', 'geekbench-6.multi', 'cinebench-r23.multi'];
+      const found = pref.find((k) => pool.some((s) => s.id === 'm:' + k));
+      activeKey = found || pool[0].id.slice(2);
+      state.rankMetric = activeKey;
+    }
+
+    const meta = DB.metrics[activeKey] || {};
+    const lower = !!meta.lowerBetter;
+    const ranked = list
+      .filter((l) => l.measured && l.v[activeKey] != null)
+      .sort((a, b) => (lower ? a.v[activeKey] - b.v[activeKey] : b.v[activeKey] - a.v[activeKey]));
+
+    const optsHtml = pool
+      .map((s) => {
+        const k = s.id.slice(2);
+        return '<option value="' + esc(k) + '"' + (k === activeKey ? ' selected' : '') + '>' + esc(s.label) + '</option>';
+      })
+      .join('');
+
+    if (!ranked.length) {
+      return (
+        '<div class="lb-card">' +
+        '<div class="lb-head"><select class="lb-sel" id="rankMetricSel">' + optsHtml + '</select></div>' +
+        '<div class="empty" style="border:0">Không có máy nào trong bộ lọc hiện tại có điểm Tinh tế đo cho bài test này.</div>' +
+        '</div>'
+      );
+    }
+
+    const vals = ranked.map((l) => l.v[activeKey]);
+    const maxV = Math.max(...vals);
+    const minV = Math.min(...vals);
+
+    const rowsHtml = ranked
+      .map((l, idx) => {
+        const v = l.v[activeKey];
+        const pct = lower ? (v > 0 && minV > 0 ? (minV / v) * 100 : 100) : maxV > 0 ? (v / maxV) * 100 : 0;
+        const w = Math.max(4, Math.min(100, pct)).toFixed(1);
+        const sub = meta.category === 'gpu' || meta.category === 'games' ? l.raw.gpu : meta.category === 'cpu' ? l.raw.cpu : [l.raw.cpu, l.raw.gpu].filter(Boolean).join(' · ');
+        return (
+          '<div class="lb-row">' +
+          '<span class="lb-rank' + (idx < 3 ? ' top' : '') + '">#' + (idx + 1) + '</span>' +
+          '<div class="lb-info"><a class="lb-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(l.name) + '</a>' +
+          (sub ? '<div class="lb-sub">' + esc(sub) + '</div>' : '') +
+          '</div>' +
+          '<div class="lb-bar-wrap"><div class="chart-track"><div class="chart-fill" style="width:' + w + '%;background:' + (idx === 0 ? 'var(--accent)' : 'var(--series-1)') + ';opacity:' + (idx === 0 ? '1' : '0.78') + '"></div></div>' +
+          '<div class="lb-val">' + esc(U.fmtNumber(v, meta.decimals)) + (meta.unit ? ' <small>' + esc(meta.unit) + '</small>' : '') + '</div></div>' +
+          '<div class="lb-act">' + cmpButton(l.id, 'cmp-toggle') + '</div>' +
+          '</div>'
+        );
+      })
+      .join('');
+
+    return (
+      '<div class="lb-card">' +
+      '<div class="lb-head">' +
+      '<select class="lb-sel" id="rankMetricSel" aria-label="Chọn bài test xếp hạng">' + optsHtml + '</select>' +
+      '<span class="muted" style="font-size:12.5px">' + ranked.length + ' máy Tinh tế tự đo · ' + (lower ? 'Thấp hơn tốt hơn' : 'Cao hơn tốt hơn') + '</span>' +
+      '</div>' +
+      '<div class="lb-list">' + rowsHtml + '</div>' +
+      '</div>'
+    );
+  }
+
   function updateResults() {
     const list = filterAndSort();
     const metricKey = state.sort.startsWith('m:') ? state.sort.slice(2) : null;
-    const grid = document.getElementById('grid');
+    const results = document.getElementById('results');
     const more = document.getElementById('more');
     const count = document.getElementById('count');
 
-    count.textContent = state.q
-      ? 'Tìm thấy ' + list.length + ' máy cho “' + state.q + '”'
+    const filters = [];
+    if (state.q) filters.push('“' + state.q + '”');
+    if (state.brand !== 'all') filters.push(state.brand);
+    count.textContent = filters.length
+      ? 'Tìm thấy ' + list.length + ' máy (' + filters.join(' · ') + ')'
       : list.length + ' máy đã test';
 
     if (!list.length) {
-      grid.innerHTML = '<div class="empty">Không tìm thấy máy nào phù hợp với bộ lọc hiện tại. Thử đổi từ khoá hoặc chọn tab "Tất cả máy".</div>';
+      results.innerHTML = '<div class="empty">Không tìm thấy máy nào phù hợp với bộ lọc hiện tại. Thử đổi từ khoá hoặc chọn lại hãng / danh mục.</div>';
       more.innerHTML = '';
       return;
     }
 
-    grid.innerHTML = list.slice(0, state.shown).map((l) => card(l, metricKey)).join('');
-    grid.querySelectorAll('.cmp-toggle').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
+    if (state.view === 'rank') {
+      results.innerHTML = renderRankView(list);
+      more.innerHTML = '';
+      const sel = document.getElementById('rankMetricSel');
+      if (sel) {
+        sel.onchange = () => {
+          state.rankMetric = sel.value;
+          history.replaceState(null, '', homeHash());
+          updateResults();
+        };
+      }
+      results.querySelectorAll('.cmp-toggle').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
+      return;
+    }
+
+    const slice = list.slice(0, state.shown);
+    if (state.view === 'table') {
+      results.innerHTML = renderTableView(slice, metricKey);
+    } else {
+      results.innerHTML = '<div class="grid">' + slice.map((l) => card(l, metricKey)).join('') + '</div>';
+    }
+    results.querySelectorAll('.cmp-toggle').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
+
     if (list.length > state.shown) {
       more.innerHTML = '<button class="btn" id="moreBtn">Xem thêm (' + (list.length - state.shown) + ' máy)</button>';
       document.getElementById('moreBtn').onclick = () => {
@@ -784,25 +1029,60 @@
       c.charts.push(ch);
     });
 
-    // Tạo các Section biểu đồ
-    const sectionHtmls = [];
-    const tocButtons = [];
+    // Dải tóm tắt nhanh tối đa 4 điểm nổi bật nhất (mỗi nhóm tối đa 1-2 bài đo thực tế)
+    const kpis = [];
+    const seenCats = {};
+    l.charts
+      .filter((ch) => !ch.ref || !l.measured)
+      .forEach((ch) => {
+        if (kpis.length >= 4) return;
+        if (seenCats[ch.category] && l.charts.some((x) => !seenCats[x.category] && (!x.ref || !l.measured))) return;
+        const hl = ch.items.find((i) => i.highlight);
+        const mainIdx = ch.series.length - 1;
+        const val = hl && hl.values[mainIdx];
+        if (val == null) return;
+        seenCats[ch.category] = true;
+        kpis.push({
+          cat: 'sec-' + (catMap[ch.category] ? ch.category : 'other'),
+          label: ch.title,
+          val: U.fmtNumber(val, ch.decimals),
+          unit: ch.unit || '',
+          rank: ch.rank && ch.rank.total > 1 ? '#' + ch.rank.rank + '/' + ch.rank.total : '',
+        });
+      });
+    const kpiHtml =
+      kpis.length >= 2
+        ? '<div class="kpi-strip">' +
+          kpis
+            .map(
+              (k) =>
+                '<button type="button" class="kpi-card" data-jump="' + esc(k.cat) + '">' +
+                '<span class="kpi-label">' + esc(k.label) + '</span>' +
+                '<span class="kpi-val"><b>' + esc(k.val) + '</b>' + (k.unit ? ' <small>' + esc(k.unit) + '</small>' : '') +
+                (k.rank ? ' <em class="kpi-rank">' + esc(k.rank) + '</em>' : '') +
+                '</span></button>'
+            )
+            .join('') +
+          '</div>'
+        : '';
 
+    // Tạo các tab nội dung (bấm tab chuyển nhóm ngay, kèm tab "Tất cả")
+    const tabDefs = [];
     LAB.SECTION_ORDER.forEach((catId) => {
       const group = catMap[catId];
       if (!group || !group.charts.length) return;
-      const secId = 'sec-' + catId;
-      tocButtons.push('<button type="button" data-target="' + secId + '">' + esc(group.title) + ' (' + group.charts.length + ')</button>');
-      const chartsHtml = renderChartBlocks(group.charts);
-      sectionHtmls.push(
-        '<section class="panel" id="' + secId + '">' +
-        '<h2>' + esc(group.title) + '</h2>' +
-        chartsHtml +
-        '</section>'
-      );
+      tabDefs.push({
+        id: 'sec-' + catId,
+        label: group.title + ' (' + group.charts.length + ')',
+        html:
+          '<section class="panel tab-panel" id="sec-' + catId + '">' +
+          '<h2>' + esc(group.title) + '</h2>' +
+          renderChartBlocks(group.charts) +
+          '</section>',
+      });
     });
 
-    // Màn hình & Pin (nếu có thông tin trong file meta laptops/*.json)
+    // Màn hình & Pin (nếu có thông tin trong laptops.json)
     const staticSecs = LAB.STATIC_SECTIONS.map((sec) => {
       const groupsHtml = sec.groups
         .map((g) => {
@@ -829,9 +1109,37 @@
         })
         .join('');
       if (!groupsHtml) return null;
-      tocButtons.push('<button type="button" data-target="sec-' + sec.id + '">' + esc(sec.title) + '</button>');
       return '<section class="panel" id="sec-' + sec.id + '"><h2>' + esc(sec.title) + '</h2>' + groupsHtml + '</section>';
     }).filter(Boolean);
+
+    const specBundle =
+      (specs ? '<section class="panel"><h2>Cấu hình</h2><div class="specs">' + specs + '</div></section>' : '') +
+      staticSecs.join('') +
+      (l.notes ? '<section class="panel"><h2>Ghi chú đánh giá</h2><p class="notes">' + esc(l.notes).replace(/\n/g, '<br>') + '</p></section>' : '');
+
+    if (specBundle) {
+      tabDefs.push({
+        id: 'sec-info',
+        label: 'Cấu hình & Thông số',
+        html: '<div class="tab-panel" id="sec-info">' + specBundle + '</div>',
+      });
+    }
+
+    const useTabs = tabDefs.length >= 2;
+    const tabsNav = useTabs
+      ? '<nav class="toc detail-tabs" role="tablist">' +
+        tabDefs
+          .map((t, i) => '<button type="button" role="tab" aria-selected="' + (i === 0) + '" data-dtab="' + esc(t.id) + '">' + esc(t.label) + '</button>')
+          .join('') +
+        '<button type="button" role="tab" aria-selected="false" data-dtab="all">Tất cả</button>' +
+        '</nav>'
+      : '';
+
+    const panelsHtml = tabDefs.length
+      ? tabDefs
+          .map((t, i) => (useTabs && i > 0 ? t.html.replace('class="panel tab-panel"', 'class="panel tab-panel" hidden').replace('class="tab-panel"', 'class="tab-panel" hidden') : t.html))
+          .join('')
+      : '<div class="empty">Chưa tìm thấy biểu đồ benchmark nào cho máy này.</div>';
 
     app.innerHTML =
       '<a class="back" href="' + homeHash() + '">← Tất cả máy</a>' +
@@ -848,14 +1156,32 @@
       '</div>' +
       '</div>' +
       '</section>' +
-      (tocButtons.length ? '<nav class="toc">' + tocButtons.join('') + '</nav>' : '') +
-      (specs ? '<section class="panel"><h2>Cấu hình</h2><div class="specs">' + specs + '</div></section>' : '') +
-      (sectionHtmls.length ? sectionHtmls.join('') : '<div class="empty">Chưa tìm thấy biểu đồ benchmark nào cho máy này.</div>') +
-      (staticSecs.length ? staticSecs.join('') : '') +
-      (l.notes ? '<section class="panel"><h2>Ghi chú đánh giá</h2><p class="notes">' + esc(l.notes).replace(/\n/g, '<br>') + '</p></section>' : '') +
+      kpiHtml +
+      tabsNav +
+      panelsHtml +
       '<p class="legend muted">Mỗi biểu đồ so sánh máy đang xem với các máy cùng loại có cùng bài test. Dòng ghi “tham khảo” là số liệu lấy từ nguồn ngoài, không do Tinh tế tự đo, và không tính vào thứ hạng.</p>';
 
     app.querySelectorAll('.cmp-btn').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
+
+    const activateDetailTab = (id) => {
+      app.querySelectorAll('.detail-tabs [data-dtab]').forEach((b) => {
+        b.setAttribute('aria-selected', b.dataset.dtab === id);
+      });
+      app.querySelectorAll('.tab-panel').forEach((p) => {
+        p.hidden = id !== 'all' && p.id !== id;
+      });
+    };
+    app.querySelectorAll('.detail-tabs [data-dtab]').forEach((b) => {
+      b.onclick = () => activateDetailTab(b.dataset.dtab);
+    });
+    app.querySelectorAll('.kpi-card[data-jump]').forEach((b) => {
+      b.onclick = () => {
+        if (useTabs) activateDetailTab(b.dataset.jump);
+        const el = document.getElementById(b.dataset.jump);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    });
+
     bindDetailCommon();
     window.scrollTo(0, 0);
   }
