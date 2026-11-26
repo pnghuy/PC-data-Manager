@@ -8,6 +8,7 @@
   const LAB = window.LAB;
   const U = LAB.util;
   const esc = U.esc;
+  const t = LAB.i18n ? LAB.i18n.t : (k) => k;
   const app = document.getElementById('app');
 
   let DB = null;
@@ -148,8 +149,8 @@
     const r = l.raw;
     const tags = [];
     if (l.brand) tags.push('<span class="tag"><b>' + esc(l.brand) + '</b></span>');
-    tags.push('<span class="tag">' + l.testCount + ' bài test</span>');
-    if (!l.measured) tags.push('<span class="tag tag-muted">Số tham khảo</span>');
+    tags.push('<span class="tag">' + esc(t('testsCount', { n: l.testCount })) + '</span>');
+    if (!l.measured) tags.push('<span class="tag tag-muted">' + esc(t('refLabel')) + '</span>');
     if (l.dateLabel) tags.push('<span class="tag tag-muted">' + esc(l.dateLabel) + '</span>');
 
     // Thẻ xem nhanh kết quả nếu đang sắp xếp theo bài test
@@ -170,13 +171,24 @@
       }
     }
 
-    // Các điểm test tiêu biểu của máy
+    // Các điểm test tiêu biểu của máy: khi đang lọc theo danh mục, chỉ hiện bài thuộc đúng danh mục đó
     const benchPills = [];
-    l.charts.filter((ch) => !ch.ref || !l.measured).slice(0, 3).forEach((ch) => {
+    const ownCharts = l.charts.filter((ch) => !ch.ref || !l.measured);
+    let pickedCharts;
+    if (state.category !== 'all') {
+      const ownInCat = ownCharts.filter((ch) => ch.category === state.category);
+      pickedCharts = ownInCat.length ? ownInCat : l.charts.filter((ch) => ch.category === state.category);
+    } else {
+      pickedCharts = ownCharts;
+    }
+    pickedCharts.slice(0, 3).forEach((ch) => {
       const hl = ch.items.find((i) => i.highlight);
-      if (hl && hl.values[0] != null) {
-        const valStr = U.fmtNumber(hl.values[0], ch.decimals) + (ch.unit ? ' ' + ch.unit : '');
-        benchPills.push('<span class="bench-pill">' + esc(ch.title) + ': <b>' + esc(valStr) + '</b></span>');
+      const mainIdx = ch.series.length - 1;
+      if (hl && hl.values[mainIdx] != null) {
+        const valStr = U.fmtNumber(hl.values[mainIdx], ch.decimals) + (ch.unit ? ' ' + ch.unit : '');
+        const isMatch = state.category !== 'all';
+        const refSuffix = ch.ref && l.measured ? ' <small>(' + esc(t('refShort')) + ')</small>' : '';
+        benchPills.push('<span class="bench-pill' + (isMatch ? ' bench-pill-hl' : '') + '">' + esc(ch.title) + ': <b>' + esc(valStr) + '</b>' + refSuffix + '</span>');
       }
     });
 
@@ -203,41 +215,9 @@
   /* ---------- Render Trang chủ ---------- */
 
   function renderHome() {
-    document.title = LAB.CONFIG.siteName + ' – Tra cứu kết quả test laptop';
+    document.title = LAB.CONFIG.siteName + ' – ' + t('siteTitle');
 
-    // Xây dựng danh sách sắp xếp
-    const baseSorts = [
-      { id: 'newest', label: 'Mới test nhất' },
-      { id: 'name', label: 'Tên A → Z' },
-      { id: 'tests', label: 'Nhiều bài test nhất' },
-    ];
-    const metricSorts = DB.sorts || [];
-    const sortOptions = baseSorts
-      .concat(metricSorts)
-      .map((s) => '<option value="' + esc(s.id) + '"' + (s.id === state.sort ? ' selected' : '') + '>' + esc(s.label) + '</option>')
-      .join('');
-
-    // Thanh lọc danh mục
-    const cats = [
-      { id: 'all', label: 'Tất cả máy (' + DB.laptops.length + ')' },
-      { id: 'cpu', label: 'Hiệu năng CPU' },
-      { id: 'gpu', label: 'Đồ hoạ' },
-      { id: 'games', label: 'Game FPS' },
-      { id: 'ai', label: 'AI cục bộ' },
-      { id: 'system', label: 'Tổng thể & pin' },
-    ].filter((c) => c.id === 'all' || DB.laptops.some((l) => l.charts.some((ch) => ch.category === c.id)));
-    const catChips = cats
-      .map(
-        (c) =>
-          '<button type="button" class="chip' +
-          (state.category === c.id ? ' active' : '') +
-          '" data-cat="' +
-          esc(c.id) +
-          '">' +
-          esc(c.label) +
-          '</button>'
-      )
-      .join('');
+    const sortOptions = buildSortOptionsHtml();
 
     // Dòng nguồn & lưu ý dữ liệu: chỉ hiện cho người quản lý khi mở với ?debug=1 (vd #/?debug=1)
     const debug = parseHash().params.get('debug') === '1';
@@ -276,41 +256,16 @@
         '</ul></div>';
     }
 
-    // Thanh lọc theo hãng (tự sinh từ dữ liệu thật)
-    const brandCounts = {};
-    DB.laptops.forEach((l) => { if (l.brand) brandCounts[l.brand] = (brandCounts[l.brand] || 0) + 1; });
-    const brandList = Object.keys(brandCounts).sort((a, b) => brandCounts[b] - brandCounts[a] || a.localeCompare(b, 'vi'));
-    const brandRow =
-      brandList.length >= 2
-        ? '<div class="brand-chips" aria-label="Lọc theo hãng">' +
-          '<button type="button" class="bchip' + (state.brand === 'all' ? ' active' : '') + '" data-brand="all">Tất cả hãng</button>' +
-          brandList
-            .map(
-              (b) =>
-                '<button type="button" class="bchip' +
-                (state.brand === b ? ' active' : '') +
-                '" data-brand="' +
-                esc(b) +
-                '">' +
-                esc(b) +
-                ' <span>' +
-                brandCounts[b] +
-                '</span></button>'
-            )
-            .join('') +
-          '</div>'
-        : '';
-
     // 3 nút icon chuyển chế độ xem (không ghi chữ)
     const viewSwitch =
-      '<div class="view-switch" role="group" aria-label="Chế độ hiển thị">' +
-      '<button type="button" class="vbtn' + (state.view === 'grid' ? ' active' : '') + '" data-view="grid" aria-pressed="' + (state.view === 'grid') + '" aria-label="Dạng thẻ" title="Dạng thẻ">' +
+      '<div class="view-switch" role="group" aria-label="' + esc(t('viewAria')) + '">' +
+      '<button type="button" class="vbtn' + (state.view === 'grid' ? ' active' : '') + '" data-view="grid" aria-pressed="' + (state.view === 'grid') + '" aria-label="' + esc(t('viewGrid')) + '" title="' + esc(t('viewGrid')) + '">' +
       '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.2"/><rect x="11" y="3" width="6" height="6" rx="1.2"/><rect x="3" y="11" width="6" height="6" rx="1.2"/><rect x="11" y="11" width="6" height="6" rx="1.2"/></svg>' +
       '</button>' +
-      '<button type="button" class="vbtn' + (state.view === 'table' ? ' active' : '') + '" data-view="table" aria-pressed="' + (state.view === 'table') + '" aria-label="Dạng bảng gọn" title="Dạng bảng gọn">' +
+      '<button type="button" class="vbtn' + (state.view === 'table' ? ' active' : '') + '" data-view="table" aria-pressed="' + (state.view === 'table') + '" aria-label="' + esc(t('viewTable')) + '" title="' + esc(t('viewTable')) + '">' +
       '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg>' +
       '</button>' +
-      '<button type="button" class="vbtn' + (state.view === 'rank' ? ' active' : '') + '" data-view="rank" aria-pressed="' + (state.view === 'rank') + '" aria-label="Bảng xếp hạng" title="Bảng xếp hạng">' +
+      '<button type="button" class="vbtn' + (state.view === 'rank' ? ' active' : '') + '" data-view="rank" aria-pressed="' + (state.view === 'rank') + '" aria-label="' + esc(t('viewRank')) + '" title="' + esc(t('viewRank')) + '">' +
       '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="10" width="3.5" height="7" rx="0.8"/><rect x="8.25" y="4" width="3.5" height="13" rx="0.8"/><rect x="13.5" y="7" width="3.5" height="10" rx="0.8"/></svg>' +
       '</button>' +
       '</div>';
@@ -319,21 +274,21 @@
       syncStatus +
       issuesBox +
       '<section class="hero">' +
-      '<h1>Tra cứu kết quả test laptop</h1>' +
-      '<p>Điểm CPU, đồ hoạ, game và pin do Tinh tế tự đo trên các máy đã review, so sánh trực tiếp với nhau.</p>' +
+      '<h1>' + esc(t('heroTitle')) + '</h1>' +
+      '<p>' + esc(t('heroDesc')) + '</p>' +
       '<label class="search">' +
       '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
-      '<input id="q" type="search" autocomplete="off" placeholder="Tìm máy, hãng, CPU, GPU… (vd: zenbook, rtx 5090)" value="' +
+      '<input id="q" type="search" autocomplete="off" placeholder="' + esc(t('searchPh')) + '" value="' +
       esc(state.q) +
       '">' +
       '</label>' +
       '</section>' +
-      '<div class="filter-chips">' + catChips + '</div>' +
-      brandRow +
+      '<div class="filter-chips" id="catChips"></div>' +
+      '<div class="brand-chips" id="brandChips" aria-label="' + esc(t('filterBrandAria')) + '"></div>' +
       '<div class="toolbar">' +
       '<div id="count" class="muted"></div>' +
       '<div class="toolbar-right">' +
-      '<label class="sort" id="sortWrap"' + (state.view === 'rank' ? ' hidden' : '') + '>Sắp xếp <select id="sort">' + sortOptions + '</select></label>' +
+      '<label class="sort" id="sortWrap"' + (state.view === 'rank' ? ' hidden' : '') + '>' + esc(t('sortLabel')) + ' <select id="sort">' + sortOptions + '</select></label>' +
       viewSwitch +
       '</div>' +
       '</div>' +
@@ -350,6 +305,7 @@
         state.q = q.value.trim();
         state.shown = LAB.CONFIG.pageSize || 24;
         history.replaceState(null, '', homeHash());
+        renderFilterChips();
         updateResults();
       }, 120);
     });
@@ -358,25 +314,6 @@
       state.sort = sortSel.value;
       history.replaceState(null, '', homeHash());
       updateResults();
-    });
-
-    app.querySelectorAll('.filter-chips .chip').forEach((btn) => {
-      btn.onclick = () => {
-        state.category = btn.dataset.cat;
-        state.shown = LAB.CONFIG.pageSize || 24;
-        history.replaceState(null, '', homeHash());
-        renderHome();
-      };
-    });
-
-    app.querySelectorAll('.brand-chips .bchip').forEach((btn) => {
-      btn.onclick = () => {
-        state.brand = btn.dataset.brand;
-        state.shown = LAB.CONFIG.pageSize || 24;
-        app.querySelectorAll('.brand-chips .bchip').forEach((b) => b.classList.toggle('active', b === btn));
-        history.replaceState(null, '', homeHash());
-        updateResults();
-      };
     });
 
     app.querySelectorAll('.view-switch .vbtn').forEach((btn) => {
@@ -412,26 +349,146 @@
       };
     }
 
-    if (!state.q && window.matchMedia('(min-width: 768px)').matches) q.focus();
+    renderFilterChips();
     updateResults();
   }
 
-  // Chọn 2 cột điểm phổ biến nhất cho chế độ bảng gọn
-  function pickTableMetrics(metricKey) {
-    const preferred = [
-      'cinebench-2024.multi',
-      'cinebench-r23.multi',
-      'geekbench-6.multi',
-      '3dmark-time-spy.score',
-      '3dmark-steel-nomad.score',
+  // Cập nhật chéo số lượng máy trên thanh Danh mục và thanh Hãng (không giật trang)
+  function renderFilterChips() {
+    const catEl = document.getElementById('catChips');
+    const brandEl = document.getElementById('brandChips');
+    if (!catEl || !brandEl) return;
+
+    const tokens = U.normalize(state.q).split(/\s+/).filter(Boolean);
+    const textPool = DB.laptops.filter((l) => tokens.every((tk) => l.search.includes(tk)));
+    const hasCat = (l, c) => c === 'all' || l.charts.some((ch) => ch.category === c);
+
+    // Nếu hãng đang chọn không còn máy trong danh mục mới thì tự trả về "Tất cả hãng"
+    const catPool = textPool.filter((l) => hasCat(l, state.category));
+    if (state.brand !== 'all' && !catPool.some((l) => l.brand === state.brand)) {
+      state.brand = 'all';
+    }
+    // Ngược lại, nếu danh mục đang chọn không còn máy trong hãng mới thì trả về "Tất cả máy"
+    const brandPool = textPool.filter((l) => state.brand === 'all' || l.brand === state.brand);
+    if (state.category !== 'all' && !brandPool.some((l) => hasCat(l, state.category))) {
+      state.category = 'all';
+    }
+
+    // 1. Thanh Danh mục (đếm theo hãng & từ khoá hiện tại)
+    const catsDef = [
+      { id: 'all', label: t('catAll', { n: brandPool.length }), plain: true },
+      { id: 'cpu', label: t('catCpu') },
+      { id: 'gpu', label: t('catGpu') },
+      { id: 'games', label: t('catGames') },
+      { id: 'ai', label: t('catAi') },
+      { id: 'system', label: t('catSystem') },
     ];
+    const catHtml = catsDef
+      .map((c) => {
+        const cnt = c.id === 'all' ? brandPool.length : brandPool.filter((l) => hasCat(l, c.id)).length;
+        if (c.id !== 'all' && cnt === 0) return '';
+        const text = c.plain ? esc(c.label) : esc(c.label) + ' <span>' + cnt + '</span>';
+        return (
+          '<button type="button" class="chip' +
+          (state.category === c.id ? ' active' : '') +
+          '" data-cat="' + esc(c.id) + '" aria-pressed="' + (state.category === c.id) + '">' +
+          text + '</button>'
+        );
+      })
+      .join('');
+    catEl.innerHTML = catHtml;
+    catEl.querySelectorAll('.chip').forEach((btn) => {
+      btn.onclick = () => {
+        state.category = btn.dataset.cat;
+        state.shown = LAB.CONFIG.pageSize || 24;
+        renderFilterChips();
+        history.replaceState(null, '', homeHash());
+        updateResults();
+      };
+    });
+
+    // 2. Thanh Hãng (đếm theo danh mục & từ khoá hiện tại)
+    const activeCatPool = textPool.filter((l) => hasCat(l, state.category));
+    const brandCounts = {};
+    activeCatPool.forEach((l) => { if (l.brand) brandCounts[l.brand] = (brandCounts[l.brand] || 0) + 1; });
+    const brandList = Object.keys(brandCounts).sort((a, b) => brandCounts[b] - brandCounts[a] || a.localeCompare(b, 'vi'));
+
+    if (brandList.length < 2) {
+      brandEl.hidden = true;
+      brandEl.innerHTML = '';
+    } else {
+      brandEl.hidden = false;
+      brandEl.innerHTML =
+        '<button type="button" class="bchip' + (state.brand === 'all' ? ' active' : '') + '" data-brand="all">' + esc(t('allBrands')) + '</button>' +
+        brandList
+          .map(
+            (b) =>
+              '<button type="button" class="bchip' +
+              (state.brand === b ? ' active' : '') +
+              '" data-brand="' + esc(b) + '" aria-pressed="' + (state.brand === b) + '">' +
+              esc(b) + ' <span>' + brandCounts[b] + '</span></button>'
+          )
+          .join('');
+      brandEl.querySelectorAll('.bchip').forEach((btn) => {
+        btn.onclick = () => {
+          state.brand = btn.dataset.brand;
+          state.shown = LAB.CONFIG.pageSize || 24;
+          renderFilterChips();
+          history.replaceState(null, '', homeHash());
+          updateResults();
+        };
+      });
+    }
+    syncSortSelect();
+  }
+
+  function buildSortOptionsHtml() {
+    const baseSorts = [
+      { id: 'newest', label: t('sortNewest') },
+      { id: 'name', label: t('sortName') },
+      { id: 'tests', label: t('sortTests') },
+    ];
+    const metricSorts = (DB.sorts || []).filter((s) => state.category === 'all' || s.category === state.category);
+    const all = baseSorts.concat(metricSorts);
+    if (!all.some((s) => s.id === state.sort)) state.sort = 'newest';
+    return all
+      .map((s) => '<option value="' + esc(s.id) + '"' + (s.id === state.sort ? ' selected' : '') + '>' + esc(s.label) + '</option>')
+      .join('');
+  }
+
+  function syncSortSelect() {
+    const sortSel = document.getElementById('sort');
+    if (!sortSel) return;
+    sortSel.innerHTML = buildSortOptionsHtml();
+    sortSel.value = state.sort;
+  }
+
+  // Chọn 2 cột điểm phù hợp với danh mục đang lọc cho chế độ bảng gọn
+  function pickTableMetrics(metricKey) {
+    const preferredByCat = {
+      cpu: ['cinebench-2024.da-nhan', 'geekbench-6.da-nhan', 'cinebench-2026.da-nhan', 'cinebench-r23.da-nhan'],
+      gpu: ['3dmark-time-spy.score', '3dmark-fire-strike.score', '3dmark-steel-nomad-light.score', '3dmark-wild-life-extreme.score'],
+      games: ['cyberpunk-2077-1080p-low-settings.score', 'cyberpunk-2077-1080p-low-settings-frame-gen-2x.score'],
+      system: ['pcmark-10.score', 'procyon-battery.score', 'pcmark-10-applications.score'],
+      all: ['cinebench-2024.da-nhan', '3dmark-time-spy.score', 'geekbench-6.da-nhan', 'cinebench-2026.da-nhan'],
+    };
     const cols = [];
-    if (metricKey && DB.metrics[metricKey]) cols.push(metricKey);
-    preferred.forEach((k) => {
+    if (metricKey && DB.metrics[metricKey] && (state.category === 'all' || DB.metrics[metricKey].category === state.category)) {
+      cols.push(metricKey);
+    }
+    const pref = preferredByCat[state.category] || (state.category === 'all' ? preferredByCat.all : []);
+    pref.forEach((k) => {
       if (cols.length >= 2) return;
       if (cols.indexOf(k) < 0 && DB.metrics[k] && DB.stats[k]) cols.push(k);
     });
-    if (cols.length < 2) {
+    if (cols.length < 2 && state.category !== 'all') {
+      Object.values(DB.metrics)
+        .filter((m) => m.dynamic && m.category === state.category && DB.stats[m.key])
+        .forEach((m) => {
+          if (cols.length < 2 && cols.indexOf(m.key) < 0) cols.push(m.key);
+        });
+    }
+    if (cols.length < 2 && state.category === 'all') {
       (DB.sorts || []).forEach((s) => {
         const k = s.id.slice(2);
         if (cols.length < 2 && cols.indexOf(k) < 0 && DB.metrics[k]) cols.push(k);
@@ -445,7 +502,8 @@
     const shortTitle = (k) => {
       const m = DB.metrics[k];
       if (!m) return k;
-      return m.testTitle ? m.testTitle.replace('Cinebench ', 'CB ').replace('3DMark ', '') : m.label;
+      const base = m.testTitle ? m.testTitle.replace('Cinebench ', 'CB ').replace('3DMark ', '') : m.label;
+      return m.seriesKey && m.seriesKey !== 'score' ? base + ' (' + m.label + ')' : base;
     };
     const rows = list
       .map((l) => {
@@ -473,7 +531,7 @@
     return (
       '<div class="ctbl-wrap"><table class="ctbl">' +
       '<thead><tr>' +
-      '<th>Mẫu laptop</th><th>CPU / GPU</th>' +
+      '<th>' + esc(t('colLaptop')) + '</th><th>' + esc(t('colHw')) + '</th>' +
       cols.map((k) => '<th class="num">' + esc(shortTitle(k)) + '</th>').join('') +
       '<th></th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div>'
@@ -481,13 +539,21 @@
   }
 
   function renderRankView(list) {
-    const available = (DB.sorts || []).filter((s) => state.category === 'all' || s.category === state.category);
-    const pool = available.length ? available : DB.sorts || [];
-    if (!pool.length) return '<div class="empty">Chưa có bài test nào đủ dữ liệu để xếp hạng.</div>';
+    // Lấy tất cả bài test có ít nhất 1 máy Tinh tế đo (để cả danh mục ít máy như AI cục bộ vẫn hiện đúng)
+    const allMetrics = Object.values(DB.metrics)
+      .filter((m) => !m.noRank && m.type !== 'text' && DB.stats[m.key] && DB.stats[m.key].values.length >= 1)
+      .sort((a, b) => LAB.SECTION_ORDER.indexOf(a.category) - LAB.SECTION_ORDER.indexOf(b.category) || (a.fullLabel || '').localeCompare(b.fullLabel || '', 'vi'))
+      .map((m) => ({ id: 'm:' + m.key, label: m.fullLabel + (m.lowerBetter ? ' (' + t('lowerBetter') + ')' : ''), category: m.category }));
+
+    const available = allMetrics.filter((s) => state.category === 'all' || s.category === state.category);
+    if (!available.length) {
+      return '<div class="empty">' + esc(state.category === 'all' ? t('rankNone') : t('rankNoCat')) + '</div>';
+    }
+    const pool = available;
 
     let activeKey = state.rankMetric;
     if (!pool.some((s) => s.id === 'm:' + activeKey)) {
-      const pref = ['cinebench-2024.multi', '3dmark-time-spy.score', 'geekbench-6.multi', 'cinebench-r23.multi'];
+      const pref = ['cinebench-2024.da-nhan', '3dmark-time-spy.score', 'geekbench-6.da-nhan', 'cinebench-2026.da-nhan'];
       const found = pref.find((k) => pool.some((s) => s.id === 'm:' + k));
       activeKey = found || pool[0].id.slice(2);
       state.rankMetric = activeKey;
@@ -510,7 +576,7 @@
       return (
         '<div class="lb-card">' +
         '<div class="lb-head"><select class="lb-sel" id="rankMetricSel">' + optsHtml + '</select></div>' +
-        '<div class="empty" style="border:0">Không có máy nào trong bộ lọc hiện tại có điểm Tinh tế đo cho bài test này.</div>' +
+        '<div class="empty" style="border:0">' + esc(t('rankNoMatch')) + '</div>' +
         '</div>'
       );
     }
@@ -542,8 +608,8 @@
     return (
       '<div class="lb-card">' +
       '<div class="lb-head">' +
-      '<select class="lb-sel" id="rankMetricSel" aria-label="Chọn bài test xếp hạng">' + optsHtml + '</select>' +
-      '<span class="muted" style="font-size:12.5px">' + ranked.length + ' máy Tinh tế tự đo · ' + (lower ? 'Thấp hơn tốt hơn' : 'Cao hơn tốt hơn') + '</span>' +
+      '<select class="lb-sel" id="rankMetricSel" aria-label="' + esc(t('rankSelectAria')) + '">' + optsHtml + '</select>' +
+      '<span class="muted" style="font-size:12.5px">' + esc(t('rankMeasured', { n: ranked.length })) + ' · ' + esc(lower ? t('lowerBetterDesc') : t('higherBetterDesc')) + '</span>' +
       '</div>' +
       '<div class="lb-list">' + rowsHtml + '</div>' +
       '</div>'
@@ -561,11 +627,11 @@
     if (state.q) filters.push('“' + state.q + '”');
     if (state.brand !== 'all') filters.push(state.brand);
     count.textContent = filters.length
-      ? 'Tìm thấy ' + list.length + ' máy (' + filters.join(' · ') + ')'
-      : list.length + ' máy đã test';
+      ? t('foundCount', { n: list.length, f: filters.join(' · ') })
+      : t('testedCount', { n: list.length });
 
     if (!list.length) {
-      results.innerHTML = '<div class="empty">Không tìm thấy máy nào phù hợp với bộ lọc hiện tại. Thử đổi từ khoá hoặc chọn lại hãng / danh mục.</div>';
+      results.innerHTML = '<div class="empty">' + esc(t('emptyFilter')) + '</div>';
       more.innerHTML = '';
       return;
     }
@@ -594,7 +660,7 @@
     results.querySelectorAll('.cmp-toggle').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
 
     if (list.length > state.shown) {
-      more.innerHTML = '<button class="btn" id="moreBtn">Xem thêm (' + (list.length - state.shown) + ' máy)</button>';
+      more.innerHTML = '<button class="btn" id="moreBtn">' + esc(t('loadMore', { n: list.length - state.shown })) + '</button>';
       document.getElementById('moreBtn').onclick = () => {
         state.shown += LAB.CONFIG.pageSize || 24;
         updateResults();
@@ -632,9 +698,9 @@
     // Thứ hạng của máy này trong số các máy Tinh tế tự đo cùng bài test
     let rankBadge = '';
     if (ch.rank && ch.rank.total > 1) {
-      rankBadge = '<span class="chart-badge" style="color:var(--good);border-color:color-mix(in srgb, var(--good) 40%, var(--line));">Hạng #' + ch.rank.rank + ' / ' + ch.rank.total + ' máy Tinh tế đo</span>';
+      rankBadge = '<span class="chart-badge" style="color:var(--good);border-color:color-mix(in srgb, var(--good) 40%, var(--line));">' + esc(t('rankBadge', { rank: ch.rank.rank, total: ch.rank.total })) + '</span>';
     }
-    if (ch.ref) rankBadge = '<span class="chart-badge">Số tham khảo</span>';
+    if (ch.ref) rankBadge = '<span class="chart-badge">' + esc(t('refLabel')) + '</span>';
     if (opts.compare) rankBadge = '';
 
     // Chỉ hiện các máy quanh máy đang xem, phần còn lại ẩn sau nút "Xem tất cả"
@@ -680,8 +746,8 @@
           '<div class="chart-item-head">' +
           '<span class="chart-item-name">' +
           nameHtml +
-          (isHl ? ' <span class="hl-tag">' + (opts.compare ? 'Tốt nhất' : 'Máy đang xem') + '</span>' : '') +
-          (it.ref && (!isHl || opts.compare) ? ' <span class="ref-tag">tham khảo</span>' : '') +
+          (isHl ? ' <span class="hl-tag">' + esc(opts.compare ? t('bestTag') : t('currentTag')) + '</span>' : '') +
+          (it.ref && (!isHl || opts.compare) ? ' <span class="ref-tag">' + esc(t('refShort')) + '</span>' : '') +
           (it.diff ? ' <span class="diff-tag">' + esc(it.diff) + '</span>' : '') +
           '</span>' +
           (it.sub ? '<span class="chart-item-sub">' + esc(it.sub) + '</span>' : '') +
@@ -703,14 +769,14 @@
       '</h3>' +
       (ch.subtitle ? '<div class="chart-sub">' + esc(ch.subtitle) + '</div>' : '') +
       '</div>' +
-      '<button type="button" class="chart-dl" title="Tải biểu đồ này về dạng ảnh PNG">' +
+      '<button type="button" class="chart-dl" title="' + esc(t('dlImgTip')) + '">' +
       '<svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M3 15v2h14v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-      '<span>Tải ảnh</span></button>' +
+      '<span>' + esc(t('dlImg')) + '</span></button>' +
       '</div>' +
       legend +
       '<div class="chart-list">' + itemsHtml + '</div>' +
-      (hiddenCount > 0 ? '<button type="button" class="btn chart-more">Xem tất cả ' + ch.items.length + ' máy</button>' : '') +
-      (opts.missing && opts.missing.length ? '<div class="chart-missing">Chưa có số: ' + opts.missing.map(esc).join(', ') + '</div>' : '') +
+      (hiddenCount > 0 ? '<button type="button" class="btn chart-more">' + esc(t('showAll', { n: ch.items.length })) + '</button>' : '') +
+      (opts.missing && opts.missing.length ? '<div class="chart-missing">' + esc(t('missingData')) + ' ' + opts.missing.map(esc).join(', ') + '</div>' : '') +
       '</div>'
     );
   }
@@ -753,21 +819,21 @@
 
   function cmpButton(id, cls) {
     const on = state.compare.indexOf(id) >= 0;
-    return '<button type="button" class="' + cls + (on ? ' on' : '') + '" data-cmp="' + esc(id) + '" aria-pressed="' + on + '">' + (on ? '✓ Đã chọn so sánh' : '+ So sánh') + '</button>';
+    return '<button type="button" class="' + cls + (on ? ' on' : '') + '" data-cmp="' + esc(id) + '" aria-pressed="' + on + '">' + esc(on ? t('cmpAdded') : t('cmpAdd')) + '</button>';
   }
 
   function toggleCompare(id) {
     const i = state.compare.indexOf(id);
     if (i >= 0) state.compare.splice(i, 1);
     else if (state.compare.length >= CMP_MAX) {
-      flashTray('Chỉ so sánh tối đa ' + CMP_MAX + ' máy một lúc. Bỏ bớt một máy trước nhé.');
+      flashTray(t('cmpMaxMsg', { n: CMP_MAX }));
       return;
     } else state.compare.push(id);
     document.querySelectorAll('[data-cmp="' + CSS.escape(id) + '"]').forEach((b) => {
       const on = state.compare.indexOf(id) >= 0;
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on);
-      b.textContent = on ? '✓ Đã chọn so sánh' : '+ So sánh';
+      b.textContent = on ? t('cmpAdded') : t('cmpAdd');
     });
     renderTray();
   }
@@ -800,22 +866,22 @@
     tray.hidden = !show;
     document.body.classList.toggle('has-tray', show);
     const nav = document.getElementById('navCompare');
-    if (nav) nav.textContent = n ? 'So sánh (' + n + ')' : 'So sánh';
+    if (nav) nav.textContent = n ? t('navCompareN', { n }) : t('navCompare');
     if (!show) return;
     const chips = state.compare
       .map((id) => {
         const l = DB.byId[id];
-        return '<span class="tray-chip"><span>' + esc(l ? dispName(l) : id) + '</span><button type="button" data-cmp="' + esc(id) + '" aria-label="Bỏ máy này">×</button></span>';
+        return '<span class="tray-chip"><span>' + esc(l ? dispName(l) : id) + '</span><button type="button" data-cmp="' + esc(id) + '" aria-label="' + esc(t('cmpRemove')) + '">×</button></span>';
       })
       .join('');
     tray.innerHTML =
       '<div class="container tray-inner">' +
-      '<div class="tray-chips">' + (chips || '<span class="muted">Chưa chọn máy nào</span>') + '<span class="tray-msg" role="status"></span></div>' +
+      '<div class="tray-chips">' + (chips || '<span class="muted">' + esc(t('cmpNone')) + '</span>') + '<span class="tray-msg" role="status"></span></div>' +
       '<div class="tray-actions">' +
-      (n ? '<button type="button" class="btn tray-clear">Bỏ chọn</button>' : '') +
+      (n ? '<button type="button" class="btn tray-clear">' + esc(t('cmpClear')) + '</button>' : '') +
       (n >= 2
-        ? '<a class="btn btn-primary" href="' + compareHash(state.compare) + '">So sánh ' + n + ' máy →</a>'
-        : '<span class="tray-hint">Chọn thêm ít nhất 1 máy</span>') +
+        ? '<a class="btn btn-primary" href="' + compareHash(state.compare) + '">' + esc(t('cmpGo', { n })) + '</a>'
+        : '<span class="tray-hint">' + esc(t('cmpHint')) + '</span>') +
       '</div>' +
       '</div>';
     tray.querySelectorAll('[data-cmp]').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
@@ -824,7 +890,7 @@
       const ids = state.compare.slice();
       state.compare = [];
       ids.forEach((id) => document.querySelectorAll('[data-cmp="' + CSS.escape(id) + '"]').forEach((b) => {
-        b.classList.remove('on'); b.setAttribute('aria-pressed', false); b.textContent = '+ So sánh';
+        b.classList.remove('on'); b.setAttribute('aria-pressed', false); b.textContent = t('cmpAdd');
       }));
       renderTray();
     };
@@ -835,13 +901,13 @@
   function renderCompare() {
     RENDERED = [];
     const list = state.compare.map((id) => DB.byId[id]).filter(Boolean);
-    document.title = 'So sánh laptop – ' + LAB.CONFIG.siteName;
+    document.title = t('cmpTitle') + ' – ' + LAB.CONFIG.siteName;
     if (list.length < 2) {
       app.innerHTML =
-        '<a class="back" href="' + homeHash() + '">← Tất cả máy</a>' +
-        '<div class="empty"><b>Chọn ít nhất 2 máy để so sánh.</b><br>Ở danh sách máy, bấm “+ So sánh” dưới mỗi máy (tối đa ' + CMP_MAX + ' máy), rồi bấm “So sánh” ở thanh dưới màn hình.' +
-        (list.length ? '<br><br>Đang chọn: <b>' + esc(dispName(list[0])) + '</b>' : '') +
-        '<br><br><a class="btn btn-primary" href="' + homeHash() + '">Chọn máy</a></div>';
+        '<a class="back" href="' + homeHash() + '">' + esc(t('backAll')) + '</a>' +
+        '<div class="empty"><b>' + esc(t('cmpNeed2')) + '</b><br>' + esc(t('cmpNeed2Hint', { n: CMP_MAX })) +
+        (list.length ? '<br><br>' + esc(t('cmpSelected')) + ' <b>' + esc(dispName(list[0])) + '</b>' : '') +
+        '<br><br><a class="btn btn-primary" href="' + homeHash() + '">' + esc(t('cmpPick')) + '</a></div>';
       window.scrollTo(0, 0);
       return;
     }
@@ -855,14 +921,14 @@
           thumb(l, 'card-thumb') +
           '<a class="cmp-name" href="#/may/' + encodeURIComponent(l.id) + '">' + esc(l.name) + '</a>' +
           '<div class="cmp-chip">' + esc([l.raw.cpu, l.raw.gpu].filter(Boolean).join(' · ')) + '</div>' +
-          (l.measured ? '' : '<span class="tag tag-muted">Số tham khảo</span>') +
-          '<button type="button" class="cmp-remove" data-remove="' + esc(l.id) + '">Bỏ khỏi so sánh</button>' +
+          (l.measured ? '' : '<span class="tag tag-muted">' + esc(t('refLabel')) + '</span>') +
+          '<button type="button" class="cmp-remove" data-remove="' + esc(l.id) + '">' + esc(t('cmpRemove')) + '</button>' +
           '</div>'
       )
       .join('');
 
     // Bảng thông số: chỉ các dòng có ít nhất một máy có số
-    const metrics = LAB.SPECS.map((m) => ({ m, group: 'Cấu hình' })).concat(
+    const metrics = LAB.SPECS.map((m) => ({ m, group: t('secSpecs') })).concat(
       ...LAB.STATIC_SECTIONS.map((sec) => [].concat(...sec.groups.map((g) => g.metrics.map((m) => ({ m, group: sec.title })))))
     );
     let lastGroup = '';
@@ -937,8 +1003,8 @@
     });
 
     const sections = [];
-    const toc = ['<button type="button" data-target="sec-specs">Thông số</button>'];
-    const catTitles = { cpu: 'Hiệu năng CPU', gpu: 'Hiệu năng đồ hoạ', games: 'Chơi game thực tế', ai: 'AI chạy cục bộ', system: 'Hiệu năng tổng thể & pin', other: 'Bài test khác' };
+    const toc = ['<button type="button" data-target="sec-specs">' + esc(t('cmpSpecs')) + '</button>'];
+    const catTitles = { cpu: t('catCpuFull'), gpu: t('catGpuFull'), games: t('catGamesFull'), ai: t('catAiFull'), system: t('catSystemFull'), other: t('catOther') };
     LAB.SECTION_ORDER.forEach((cat) => {
       const cs = charts
         .filter((c) => (catTitles[c.category] ? c.category : 'other') === cat)
@@ -954,18 +1020,18 @@
     });
 
     app.innerHTML =
-      '<a class="back" href="' + homeHash() + '">← Tất cả máy</a>' +
-      '<section class="cmp-top"><h1>So sánh ' + list.length + ' máy</h1>' +
-      '<div class="actions"><button class="btn" type="button" id="copyLink">🔗 Sao chép link so sánh</button>' +
-      (list.length < CMP_MAX ? '<a class="btn" href="' + homeHash() + '">+ Thêm máy</a>' : '') +
+      '<a class="back" href="' + homeHash() + '">' + esc(t('backAll')) + '</a>' +
+      '<section class="cmp-top"><h1>' + esc(t('cmpHeading', { n: list.length })) + '</h1>' +
+      '<div class="actions"><button class="btn" type="button" id="copyLink">' + esc(t('cmpCopyLink')) + '</button>' +
+      (list.length < CMP_MAX ? '<a class="btn" href="' + homeHash() + '">' + esc(t('cmpAddMore')) + '</a>' : '') +
       '</div></section>' +
       '<div class="cmp-heads" style="--cols:' + cols + '">' + heads + '</div>' +
       '<nav class="toc">' + toc.join('') + '</nav>' +
-      '<section class="panel" id="sec-specs"><h2>Thông số</h2><div class="cmp-table-wrap"><table class="cmp-table" style="--cols:' + cols + '">' +
+      '<section class="panel" id="sec-specs"><h2>' + esc(t('cmpSpecs')) + '</h2><div class="cmp-table-wrap"><table class="cmp-table" style="--cols:' + cols + '">' +
       '<thead><tr><th></th>' + list.map((l) => '<th scope="col">' + esc(dispName(l)) + '</th>').join('') + '</tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>' +
       sections.join('') +
-      '<p class="legend muted">Dòng “Tốt nhất” là máy Tinh tế đo có kết quả cao nhất trong nhóm đang so sánh; con số % là chênh lệch so với máy đó. Số “tham khảo” lấy từ nguồn ngoài, không dùng để chọn máy tốt nhất.</p>';
+      '<p class="legend muted">' + esc(t('cmpLegend')) + '</p>';
 
     app.querySelectorAll('[data-remove]').forEach((b) => {
       b.onclick = () => {
@@ -985,21 +1051,21 @@
     RENDERED = [];
     const l = DB.byId[id];
     if (!l) {
-      document.title = 'Không tìm thấy máy – ' + LAB.CONFIG.siteName;
+      document.title = t('notFound') + ' – ' + LAB.CONFIG.siteName;
       app.innerHTML =
-        '<a class="back" href="' + homeHash() + '">← Tất cả máy</a>' +
-        '<div class="empty">Không tìm thấy máy <b>' + esc(id) + '</b>. Có thể máy đã được đổi tên trong kho dữ liệu.</div>';
+        '<a class="back" href="' + homeHash() + '">' + esc(t('backAll')) + '</a>' +
+        '<div class="empty">' + t('notFoundDesc', { id: esc(id) }) + '</div>';
       return;
     }
 
     const r = l.raw;
-    document.title = l.name + ' – Kết quả test | ' + LAB.CONFIG.siteName;
+    document.title = l.name + ' – ' + t('detailTitleSuffix') + ' | ' + LAB.CONFIG.siteName;
 
-    const sub = [l.brand, l.dateLabel ? 'Test ' + l.dateLabel : '', l.variant, l.measured ? '' : 'Số tham khảo, không do Tinh tế tự đo'].filter(Boolean).join(' · ');
+    const sub = [l.brand, l.dateLabel ? t('testDatePrefix', { d: l.dateLabel }) : '', l.variant, l.measured ? '' : t('refLong')].filter(Boolean).join(' · ');
     const info = [
-      l.model ? 'Model: <b>' + esc(l.model) + '</b>' : '',
-      l.tester ? 'Người test: <b>' + esc(l.tester) + '</b>' : '',
-      l.dateLabel ? 'Thời gian test: <b>' + esc(l.dateLabel) + '</b>' : '',
+      l.model ? esc(t('modelLabel')) + ' <b>' + esc(l.model) + '</b>' : '',
+      l.tester ? esc(t('testerLabel')) + ' <b>' + esc(l.tester) + '</b>' : '',
+      l.dateLabel ? esc(t('dateLabel')) + ' <b>' + esc(l.dateLabel) + '</b>' : '',
     ].filter(Boolean);
 
     // Cấu hình máy test
@@ -1016,12 +1082,12 @@
 
     // Phân nhóm các bài test theo Category
     const catMap = {
-      cpu: { title: 'Hiệu năng CPU', charts: [] },
-      gpu: { title: 'Hiệu năng đồ hoạ', charts: [] },
-      games: { title: 'Chơi game thực tế', charts: [] },
-      ai: { title: 'AI chạy cục bộ', charts: [] },
-      system: { title: 'Hiệu năng tổng thể & pin', charts: [] },
-      other: { title: 'Bài test khác', charts: [] },
+      cpu: { title: t('catCpuFull'), charts: [] },
+      gpu: { title: t('catGpuFull'), charts: [] },
+      games: { title: t('catGamesFull'), charts: [] },
+      ai: { title: t('catAiFull'), charts: [] },
+      system: { title: t('catSystemFull'), charts: [] },
+      other: { title: t('catOther'), charts: [] },
     };
 
     l.charts.forEach((ch) => {
@@ -1113,14 +1179,14 @@
     }).filter(Boolean);
 
     const specBundle =
-      (specs ? '<section class="panel"><h2>Cấu hình</h2><div class="specs">' + specs + '</div></section>' : '') +
+      (specs ? '<section class="panel"><h2>' + esc(t('secSpecs')) + '</h2><div class="specs">' + specs + '</div></section>' : '') +
       staticSecs.join('') +
-      (l.notes ? '<section class="panel"><h2>Ghi chú đánh giá</h2><p class="notes">' + esc(l.notes).replace(/\n/g, '<br>') + '</p></section>' : '');
+      (l.notes ? '<section class="panel"><h2>' + esc(t('secNotes')) + '</h2><p class="notes">' + esc(l.notes).replace(/\n/g, '<br>') + '</p></section>' : '');
 
     if (specBundle) {
       tabDefs.push({
         id: 'sec-info',
-        label: 'Cấu hình & Thông số',
+        label: t('tabSpecs'),
         html: '<div class="tab-panel" id="sec-info">' + specBundle + '</div>',
       });
     }
@@ -1129,20 +1195,20 @@
     const tabsNav = useTabs
       ? '<nav class="toc detail-tabs" role="tablist">' +
         tabDefs
-          .map((t, i) => '<button type="button" role="tab" aria-selected="' + (i === 0) + '" data-dtab="' + esc(t.id) + '">' + esc(t.label) + '</button>')
+          .map((tItem, i) => '<button type="button" role="tab" aria-selected="' + (i === 0) + '" data-dtab="' + esc(tItem.id) + '">' + esc(tItem.label) + '</button>')
           .join('') +
-        '<button type="button" role="tab" aria-selected="false" data-dtab="all">Tất cả</button>' +
+        '<button type="button" role="tab" aria-selected="false" data-dtab="all">' + esc(t('tabAll')) + '</button>' +
         '</nav>'
       : '';
 
     const panelsHtml = tabDefs.length
       ? tabDefs
-          .map((t, i) => (useTabs && i > 0 ? t.html.replace('class="panel tab-panel"', 'class="panel tab-panel" hidden').replace('class="tab-panel"', 'class="tab-panel" hidden') : t.html))
+          .map((tItem, i) => (useTabs && i > 0 ? tItem.html.replace('class="panel tab-panel"', 'class="panel tab-panel" hidden').replace('class="tab-panel"', 'class="tab-panel" hidden') : tItem.html))
           .join('')
-      : '<div class="empty">Chưa tìm thấy biểu đồ benchmark nào cho máy này.</div>';
+      : '<div class="empty">' + esc(t('noCharts')) + '</div>';
 
     app.innerHTML =
-      '<a class="back" href="' + homeHash() + '">← Tất cả máy</a>' +
+      '<a class="back" href="' + homeHash() + '">' + esc(t('backAll')) + '</a>' +
       '<section class="detail-hero">' +
       thumb(l, 'detail-thumb') +
       '<div class="detail-head">' +
@@ -1150,25 +1216,25 @@
       '<h1>' + esc(l.name) + '</h1>' +
       (info.length ? '<div class="detail-info">' + info.join('<span class="dot">•</span>') + '</div>' : '') +
       '<div class="actions">' +
-      (l.review ? '<a class="btn" href="' + esc(l.review) + '" target="_blank" rel="noopener">📝 Bài review Tinh tế ↗</a>' : '') +
+      (l.review ? '<a class="btn" href="' + esc(l.review) + '" target="_blank" rel="noopener">' + esc(t('reviewBtn')) + '</a>' : '') +
       cmpButton(l.id, 'btn cmp-btn') +
-      '<button class="btn" type="button" id="copyLink">🔗 Sao chép link máy này</button>' +
+      '<button class="btn" type="button" id="copyLink">' + esc(t('copyLink')) + '</button>' +
       '</div>' +
       '</div>' +
       '</section>' +
       kpiHtml +
       tabsNav +
       panelsHtml +
-      '<p class="legend muted">Mỗi biểu đồ so sánh máy đang xem với các máy cùng loại có cùng bài test. Dòng ghi “tham khảo” là số liệu lấy từ nguồn ngoài, không do Tinh tế tự đo, và không tính vào thứ hạng.</p>';
+      '<p class="legend muted">' + esc(t('detailLegend')) + '</p>';
 
     app.querySelectorAll('.cmp-btn').forEach((b) => { b.onclick = () => toggleCompare(b.dataset.cmp); });
 
-    const activateDetailTab = (id) => {
+    const activateDetailTab = (tabId) => {
       app.querySelectorAll('.detail-tabs [data-dtab]').forEach((b) => {
-        b.setAttribute('aria-selected', b.dataset.dtab === id);
+        b.setAttribute('aria-selected', b.dataset.dtab === tabId);
       });
       app.querySelectorAll('.tab-panel').forEach((p) => {
-        p.hidden = id !== 'all' && p.id !== id;
+        p.hidden = tabId !== 'all' && p.id !== tabId;
       });
     };
     app.querySelectorAll('.detail-tabs [data-dtab]').forEach((b) => {
@@ -1199,10 +1265,10 @@
     app.querySelectorAll('.chart-group').forEach((g) => {
       const tabs = g.querySelectorAll('.chart-tabs [data-tab]');
       const cards = g.querySelectorAll(':scope > .chart-card');
-      tabs.forEach((t) => {
-        t.onclick = () => {
-          tabs.forEach((x) => x.setAttribute('aria-selected', x === t));
-          cards.forEach((c, i) => { c.hidden = String(i) !== t.dataset.tab; });
+      tabs.forEach((tabBtn) => {
+        tabBtn.onclick = () => {
+          tabs.forEach((x) => x.setAttribute('aria-selected', x === tabBtn));
+          cards.forEach((c, i) => { c.hidden = String(i) !== tabBtn.dataset.tab; });
         };
       });
     });
@@ -1214,16 +1280,16 @@
         const ch = RENDERED[+cardEl.dataset.ci];
         const visible = Array.from(cardEl.querySelectorAll('.chart-item:not([hidden])')).map((el) => ch.items[+el.dataset.ii]);
         const label = b.querySelector('span');
-        label.textContent = 'Đang tạo…';
-        const footer = DB.index.commitDate ? 'Dữ liệu cập nhật ' + U.fmtDate(U.parseDate(DB.index.commitDate)) : '';
+        label.textContent = t('dlCreating');
+        const footer = DB.index.commitDate ? t('sourceUpdated', { d: U.fmtDate(U.parseDate(DB.index.commitDate)) }) : '';
         LAB.exportChartPNG(ch, visible, { footer, filename: 'tinhte-' + U.slugify(ch.title) })
-          .catch((e) => { console.error(e); alert('Không tạo được ảnh: ' + e.message); })
-          .finally(() => { label.textContent = 'Tải ảnh'; });
+          .catch((e) => { console.error(e); alert('PNG error: ' + e.message); })
+          .finally(() => { label.textContent = t('dlImg'); });
       };
     });
 
-    // Cuộn mượt khi bấm các tab TOC
-    app.querySelectorAll('.toc button').forEach((b) => {
+    // Cuộn mượt khi bấm các tab TOC (trang so sánh)
+    app.querySelectorAll('.toc button[data-target]').forEach((b) => {
       b.onclick = () => {
         const el = document.getElementById(b.dataset.target);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1237,19 +1303,21 @@
       copyBtn.onclick = () => {
         const url = location.href;
         const done = () => {
-          copyBtn.textContent = 'Đã sao chép link ✓';
+          copyBtn.textContent = t('copied');
           setTimeout(() => (copyBtn.textContent = idle), 1800);
         };
         if (navigator.clipboard && window.isSecureContext) {
-          navigator.clipboard.writeText(url).then(done, () => window.prompt('Sao chép link:', url));
+          navigator.clipboard.writeText(url).then(done, () => window.prompt(t('copyLink'), url));
         } else {
-          window.prompt('Sao chép link:', url);
+          window.prompt(t('copyLink'), url);
         }
       };
     }
   }
 
-  /* ---------- Chuyển giao diện Sáng / Tối ---------- */
+  /* ---------- Chuyển giao diện Sáng / Tối & Đa ngôn ngữ ---------- */
+
+  let syncThemeLabel = () => {};
 
   function initThemeToggle() {
     const btn = document.getElementById('themeToggle');
@@ -1259,9 +1327,9 @@
 
     const currentTheme = () => (root.dataset.theme === 'dark' ? 'dark' : 'light');
 
-    const syncLabel = () => {
+    syncThemeLabel = () => {
       const isLight = currentTheme() === 'light';
-      const label = isLight ? 'Chuyển sang giao diện tối' : 'Chuyển sang giao diện sáng';
+      const label = isLight ? t('themeToDark') : t('themeToLight');
       btn.setAttribute('aria-label', label);
       btn.setAttribute('title', label);
     };
@@ -1274,29 +1342,70 @@
       } catch (e) {
         // Bỏ qua khi trình duyệt chặn localStorage
       }
-      syncLabel();
+      syncThemeLabel();
     });
 
-    syncLabel();
+    syncThemeLabel();
+  }
+
+  function updateSourceLine() {
+    const src = document.getElementById('dataSource');
+    if (!src || !DB) return;
+    src.textContent =
+      t('sourceCount', { n: DB.laptops.length }) +
+      (DB.index.commitDate ? ' · ' + t('sourceUpdated', { d: U.fmtDate(U.parseDate(DB.index.commitDate)) }) : '');
+  }
+
+  function applyStaticI18n() {
+    const navAll = document.getElementById('navAll');
+    if (navAll) navAll.textContent = t('navAll');
+    const navCmp = document.getElementById('navCompare');
+    if (navCmp) navCmp.textContent = state.compare.length ? t('navCompareN', { n: state.compare.length }) : t('navCompare');
+    const loading = document.getElementById('loadingState');
+    if (loading) loading.textContent = t('loading');
+    const foot = document.getElementById('footerNote');
+    if (foot) foot.innerHTML = t('footerNote');
+    const langSel = document.getElementById('langSelect');
+    if (langSel) {
+      langSel.setAttribute('aria-label', t('langLabel'));
+      langSel.setAttribute('title', t('langLabel'));
+    }
+    syncThemeLabel();
+    updateSourceLine();
+  }
+
+  function initLanguage() {
+    const sel = document.getElementById('langSelect');
+    if (!sel || !LAB.i18n) return;
+    sel.value = LAB.i18n.getLang();
+    sel.addEventListener('change', () => {
+      LAB.i18n.setLang(sel.value);
+      applyStaticI18n();
+      if (DB) {
+        route();
+        renderTray();
+      }
+    });
+    applyStaticI18n();
   }
 
   /* ---------- Khởi động ứng dụng ---------- */
 
   initThemeToggle();
+  initLanguage();
 
   LAB.loadData()
     .then((db) => {
       DB = db;
-      const src = document.getElementById('dataSource');
-      if (src) src.textContent = DB.laptops.length + ' máy' + (DB.index.commitDate ? ' · Dữ liệu cập nhật ' + U.fmtDate(U.parseDate(DB.index.commitDate)) : '');
+      updateSourceLine();
       window.addEventListener('hashchange', route);
       route();
     })
     .catch((err) => {
       console.error(err);
       app.innerHTML =
-        '<div class="empty"><b>Không tải được kho dữ liệu benchmark.</b><br>' +
+        '<div class="empty"><b>' + esc(t('loadErrTitle')) + '</b><br>' +
         esc(err.message) +
-        '<br><br>Kiểm tra kết nối mạng hoặc thử <button class="btn" onclick="location.reload()">Tải lại trang</button></div>';
+        '<br><br>' + esc(t('loadErrHint')) + ' <button class="btn" onclick="location.reload()">' + esc(t('reloadBtn')) + '</button></div>';
     });
 })();

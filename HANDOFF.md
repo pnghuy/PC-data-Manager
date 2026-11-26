@@ -11,24 +11,22 @@ Luật chung của repo xem ở `AGENTS.md`.
 - **`main` đang có:**
   - App đọc `kho.json` và `laptops.json` của tinhte-charts, hiện 32 máy
   - Giao diện public chuẩn màu & phong cách Tinhte.vn (`#0768ea`, mặc định Light mode, Dark mode xám than `#18191a`) + Logo Phương án A (PR #9)
-  - Nút chuyển Sáng/Tối (PR #8), so sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
+  - Nút chuyển Sáng/Tối (PR #8), dàn trang chống cuộn dài với lọc hãng + 3 nút icon chế độ xem + dải KPI & tab trang máy (PR #10)
+  - So sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
   - Đã deploy thử nghiệm trên GitHub Pages (`https://pnghuy.github.io/PC-data-Manager/`) qua workflow `.github/workflows/deploy-pages.yml`
-- **PR đang mở:** `layout-compact` (lọc nhanh theo hãng, 3 nút icon chuyển chế độ xem Thẻ / Bảng gọn / Xếp hạng ở trang chủ, dải tóm tắt điểm nổi bật + tab chuyển nhóm tại chỗ ở trang chi tiết máy)
+- **PR đang mở:** `i18n-multilang` (đa ngôn ngữ giao diện: Tiếng Việt mặc định + 5 ngôn ngữ phổ biến English, 中文, 日本語, 한국어, Español qua bộ chọn trên topbar)
 - **Chưa làm:**
-  - Đa ngôn ngữ giao diện (Tiếng Việt mặc định + 5 ngôn ngữ phổ biến)
   - Ảnh thực tế máy và link bài review trong `laptops.json` (hầu hết máy chưa có, cần anh cung cấp)
-  - Gắn tên miền riêng sau khi hoàn thiện giao diện, logo và ảnh máy
+  - Gắn tên miền riêng sau khi hoàn thiện ảnh máy
 
 ## Việc tiếp theo (theo thứ tự)
 
-1. **Đa ngôn ngữ giao diện (i18n)**
-   - Mặc định Tiếng Việt, thêm 5 ngôn ngữ phổ biến (English, 中文, 日本語, 한국어, Español) qua nút chọn trên topbar.
-2. **Bổ sung `laptops.json` ở tinhte-charts**
+1. **Bổ sung `laptops.json` ở tinhte-charts**
    - Điền `image_url` (ảnh thực tế của máy), `review_url`, màn hình, pin cho các máy đã có bài review.
    - Chỉ điền số có thật.
-3. **Gắn tên miền riêng & public chính thức**
+2. **Gắn tên miền riêng & public chính thức**
    - Sau khi giao diện, logo và ảnh máy đã chỉn chu, gắn tên miền riêng (Cloudflare Pages hoặc GitHub Pages, xem mục 5 `README.md`).
-4. **(Chờ dữ liệu) Geekbench cắm sạc và chạy pin**
+3. **(Chờ dữ liệu) Geekbench cắm sạc và chạy pin**
    - Chỉ làm khi `kho.json` có điểm đo lúc chạy pin, ví dụ thêm id bài test `geekbench-7-battery` ở Chart Studio.
 
 ## Việc đang làm dở
@@ -93,4 +91,5 @@ Muốn làm việc khác thì thay nửa sau của câu bằng việc cụ thể
 | 2026-11-25 | Antigravity | PR #7: chuẩn bị deploy (`dist/`, workflow GitHub Pages, hướng dẫn Cloudflare/GitHub Pages) |
 | 2026-11-25 | Antigravity | PR #8: thêm nút chuyển giao diện Sáng/Tối trên topbar (lưu `localStorage`) |
 | 2026-11-26 | Antigravity | PR #9: bảng màu & phong cách chuẩn Tinhte.vn (`#0768ea`, mặc định Light mode), Logo Phương án A |
-| 2026-11-26 | Antigravity | Dàn trang chống cuộn dài: lọc theo hãng, 3 nút icon chuyển chế độ xem, dải KPI + tab nhóm trang máy |
+| 2026-11-26 | Antigravity | PR #10: dàn trang chống cuộn dài (lọc hãng, 3 nút icon chuyển chế độ xem, dải KPI + tab trang máy) |
+| 2026-11-26 | Antigravity | Thêm đa ngôn ngữ giao diện (Tiếng Việt mặc định + English, 中文, 日本語, 한국어, Español) |

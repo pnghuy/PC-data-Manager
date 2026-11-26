@@ -79,6 +79,14 @@ main.container { flex: 1; padding-top: 20px; padding-bottom: 48px; }
   transition: background 0.15s, color 0.15s;
 }
 .topnav a:hover { color: var(--accent); background: var(--bg-3); }
+.lang-select {
+  height: 36px; padding: 0 10px; margin-left: 2px;
+  font: inherit; font-size: 12.5px; font-weight: 700;
+  color: var(--text); background: var(--bg-3);
+  border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.lang-select:hover, .lang-select:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
 .theme-toggle {
   display: inline-grid; place-items: center;
   width: 36px; height: 36px; padding: 0; margin-left: 4px;
@@ -723,9 +731,12 @@ body.has-tray { padding-bottom: 84px; }
 }
 
 /* ================= Dàn trang chống cuộn dài ================= */
+.chip span { font-weight: 500; opacity: 0.72; margin-left: 3px; font-size: 12px; }
+.chip.active span { opacity: 0.88; }
 .brand-chips {
   display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; scrollbar-width: none;
 }
+.brand-chips[hidden] { display: none; }
 .brand-chips::-webkit-scrollbar { display: none; }
 .bchip {
   flex-shrink: 0; font: inherit; font-size: 12.5px; font-weight: 600;

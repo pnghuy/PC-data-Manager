@@ -56,6 +56,7 @@ const requiredOutputs = [
   'js/schema.js',
   'js/data.js',
   'js/export.js',
+  'js/i18n.js',
   'js/app.js',
   'data/kho-snapshot.js',
 ];
