@@ -7,22 +7,23 @@ Luật chung của repo xem ở `AGENTS.md`.
 
 ## Trạng thái hiện tại
 
-- **Cập nhật lần cuối:** 2026-11-26, Antigravity
+- **Cập nhật lần cuối:** 2026-11-27, Claude
 - **`main` đang có:**
   - App đọc `kho.json` và `laptops.json` của tinhte-charts, hiện 32 máy
   - Giao diện public chuẩn màu & phong cách Tinhte.vn (`#0768ea`, mặc định Light mode, Dark mode xám than `#18191a`) + Logo Phương án A (PR #9)
   - Nút chuyển Sáng/Tối (PR #8), dàn trang chống cuộn dài với lọc hãng + 3 nút icon chế độ xem + dải KPI & tab trang máy (PR #10)
   - Đa ngôn ngữ giao diện 6 thứ tiếng (`vi` mặc định + `en`, `zh`, `ja`, `ko`, `es`) và bộ lọc chéo Danh mục × Hãng đồng bộ với thẻ máy, bảng gọn, sắp xếp, bảng xếp hạng (PR #11)
   - So sánh 2–4 máy (`#/so-sanh`), tab Cinebench/Geekbench/3DMark, tải biểu đồ về PNG
+  - Giao diện kiểu bảng số liệu (PR giao-dien-bang-xep-hang, đang chờ merge): trang chủ mặc định là bảng xếp hạng với cột chọn bài test bên trái; trang máy có số lớn + dải phân bố; trang so sánh có "Bảng điểm" dạng ma trận. Góc vuông, kẻ mảnh, số font IBM Plex Mono, bỏ pill/bóng/emoji. Tên máy hiện kèm hãng qua `fullName()` trong `js/app.js`.
   - Đã deploy thử nghiệm trên GitHub Pages (`https://pnghuy.github.io/PC-data-Manager/`) qua workflow `.github/workflows/deploy-pages.yml`
-- **PR đang mở:** Không có.
+- **PR đang mở:** `giao-dien-bang-xep-hang` (làm mới giao diện).
 - **Chưa làm:**
   - Ảnh thực tế máy và link bài review trong `laptops.json` (hầu hết máy chưa có, cần anh cung cấp)
   - Gắn tên miền riêng sau khi hoàn thiện ảnh máy
 
 ## Việc tiếp theo (theo thứ tự)
 
-1. **Bổ sung `laptops.json` ở tinhte-charts**
+1. **Bổ sung `laptops.json` ở tinhte-charts** (anh tạm gác 2026-11-27; danh sách link bài chờ xác nhận ở file `laptop-lab/laptops-json-can-xac-nhan.md` trong thư mục dự án của Claude)
    - Điền `image_url` (ảnh thực tế của máy), `review_url`, màn hình, pin cho các máy đã có bài review.
    - Chỉ điền số có thật.
 2. **Gắn tên miền riêng & public chính thức**
@@ -94,3 +95,4 @@ Muốn làm việc khác thì thay nửa sau của câu bằng việc cụ thể
 | 2026-11-26 | Antigravity | PR #9: bảng màu & phong cách chuẩn Tinhte.vn (`#0768ea`, mặc định Light mode), Logo Phương án A |
 | 2026-11-26 | Antigravity | PR #10: dàn trang chống cuộn dài (lọc hãng, 3 nút icon chuyển chế độ xem, dải KPI + tab trang máy) |
 | 2026-11-26 | Antigravity | PR #11: đa ngôn ngữ 6 thứ tiếng (`vi`/`en`/`zh`/`ja`/`ko`/`es`) + sửa lọc chéo Danh mục × Hãng, chống lẫn bài test khác danh mục trên thẻ/bảng/sắp xếp/xếp hạng |
+| 2026-11-27 | Claude | Làm mới giao diện kiểu bảng số liệu: bảng xếp hạng mặc định, dải phân bố ở trang máy, bảng điểm ma trận ở trang so sánh |
