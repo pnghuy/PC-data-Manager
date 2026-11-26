@@ -731,9 +731,12 @@ body.has-tray { padding-bottom: 84px; }
 }
 
 /* ================= Dàn trang chống cuộn dài ================= */
+.chip span { font-weight: 500; opacity: 0.72; margin-left: 3px; font-size: 12px; }
+.chip.active span { opacity: 0.88; }
 .brand-chips {
   display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; scrollbar-width: none;
 }
+.brand-chips[hidden] { display: none; }
 .brand-chips::-webkit-scrollbar { display: none; }
 .bchip {
   flex-shrink: 0; font: inherit; font-size: 12.5px; font-weight: 600;
